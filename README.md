@@ -156,9 +156,9 @@ Star schema with 3 fact tables, 3 operational snapshot tables and 7 dimension ta
 | `fact_user_event` | fact | One record per user generated event occurence | ~12M rows |
 | `fact_investment_position` | fact | One record per investment position created by a user  | ~1.1M rows |
 | `fact_transaction` | fact | One record per money movement transaction within the application | ~5M rows |
-| `wallet_current_state` | snapshot | Latest wallet state per wallet account (based on latest pipeline run) | ~2,000,000 rows |
+| `wallet_current_state` | snapshot | Latest wallet state per wallet account (based on latest pipeline run) | ~500k rows |
 | `investment_position_current_state` | snapshot | Latest investment position state  | ~1,100,000 rows |
-| `user_current_state` | snapshot | Latest user lifecycle state  | ~2,000,000 rows |
+| `user_current_state` | snapshot | Latest user lifecycle state  | ~500k rows |
 
 > The full data dictionary covering all fact & dimension tables, column definitions, data types, and grain is available in [Source Data Dictionary](https://github.com/ajibola-komo/FinFlow-Product-Analytics-Engineering-Platform/blob/main/docs/documentation/data-generation/01-Finflow%20End-To-End%20Analytics%20-%20Source%20Data%20Dictionary.pdf)
 
@@ -198,7 +198,7 @@ This simulates a real-world semantic layer where downstream BI tools consume gov
 - Snowflake
 - dbt
 - Airflow
-- Google Cloud Storage
+- Azure
 - Power BI
 - Customer Lifecycle Analytics
 - Funnel Analysis
@@ -209,5 +209,5 @@ This simulates a real-world semantic layer where downstream BI tools consume gov
 **Ajibola Komolafe** — Analytics Engineer | Data Analyst
 - [LinkedIn](https://www.linkedin.com/in/ajibola-k-4ba921123/) 
 - [GitHub](https://github.com/ajibola-komo)
-- [Kaggle](https://github.com/ajibola-komo)
+- [Kaggle](https://www.kaggle.com/ajibsss)
 - [Power BI](https://github.com/ajibola-komo)

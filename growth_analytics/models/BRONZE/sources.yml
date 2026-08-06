@@ -4,7 +4,7 @@ sources:
   - name: bronze
     database: FINFLOW
     schema: BRONZE
-    description: "Raw ingested data from S3 via Snowflake external stage"
+    description: "Raw ingested data from Azure Blob Storage via Snowflake external stage"
 
     tables:
       - name: dim_user
