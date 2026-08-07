@@ -2,9 +2,23 @@
 
 Event-driven fintech analytics platform combining analytics engineering and product analytics to model user behavior, retention, growth, and financial activity at scale.
 
+## Table of Contents
+
+1. [Problem Statement](#1-problem-statement)
+2. [Project Objectives](#2-project-objectives)
+3. [Business Questions Answered](#3-business-questions-answered)
+4. [Tech Stack](#4-tech-stack)
+5. [Architecture Overview](#5-architecture-overview)
+6. [Product or Platform Event Flow](#6-product-or-platform-event-flow)
+7. [Synthetic Data Generation](#7-synthetic-data-generation)
+8. [Data Model](#8-data-model)
+9. [Business Intelligence Layer Strategy](#9-business-intelligence-layer-strategy)
+10. [Key Skills Demonstrated](#10-key-skills-demonstrated)
+11. [Author](#11-author)
+
 ---
 
-# Problem Statement
+# 1. Problem Statement
 
 Modern fintech products generate large volumes of user behavioral and transactional data across multiple channels including mobile applications, payment systems, and investment platforms. Every user action from onboarding and account funding to transfers, investments, and daily engagement produces event-level data that needs to be captured, processed, and converted into meaningful business insights.
 
@@ -24,7 +38,7 @@ This project is designed to address these challenges by building a production-st
 
 ---
 
-# Project Objectives
+# 2. Project Objectives
 
 This project aims to design and implement a production-style **fintech product analytics** and analytics engineering platform that simulates how modern digital financial systems collect, process, model, and analyze behavioral and transactional data.
 
@@ -51,7 +65,7 @@ The project focuses on demonstrating modern analytics engineering and product an
 
 ---
 
-## Business Questions Answered
+# 3. Business Questions Answered
 
 The platform is designed to answer questions such as:
 
@@ -63,26 +77,23 @@ The platform is designed to answer questions such as:
 - What customer behaviours are leading indicators of churn?
 - What is the relationship between engagement and product adoption?
 
----
-
-# Tech Stack
+# 4. Tech Stack
 
 | Layer | Tool |
 |---|---|
 | Data generation | Python (Faker, NumPy, Pandas) |
 | Workflow Orchestration| Airflow |
 | Compute & Infrastructre| Google Compute Engine (GCE,Linux), Git-based deployment |
-| Storage | Google Cloud Storage |
+| Storage and Data Lake | Azure Data Lake Storage Gen 2 |
 | Warehouse | Snowflake / DuckDB |
 | Transformation | dbt |
 | Visualization | Power BI |
 
 ---
 
+# 5. Architecture Overview
 
-# Architecture Overview
-
-## High-Level Architecture
+## 5.1. High-Level Architecture
 
 ```text
 Python Event Generator
@@ -100,11 +111,17 @@ Analytics Marts
 BI Dashboards (Power BI)
 ```
 
-## Data Lakehouse and Warehouse Architecture
+## 5.2. Data Lakehouse and Warehouse Architecture
 
-The project implements a Medallion-inspired transformation pattern using dbt within Snowflake, with raw data stored in S3.
+The project implements a Medallion-inspired transformation pattern using dbt within Snowflake, with raw data stored in ADLS.
 ```
-Python scripts → S3 (data lake) → Snowflake (warehouse) + dbt (transformations implementing Medallion architecture: Bronze, Silver, Gold) → Power BI
+Python scripts 
+       ↓
+Azure Data Lake Storage Gen 2 
+       ↓
+Snowflake (warehouse) + dbt (transformations implementing Medallion architecture: Bronze, Silver, Gold)
+       ↓ 
+Power BI
 ```
 
 - **Bronze** — raw ingested data
@@ -115,13 +132,13 @@ Python scripts → S3 (data lake) → Snowflake (warehouse) + dbt (transformatio
 
 ---
 
-# Product or Platform Event Flow
+# 6. Product or Platform Event Flow
 
 ![Event Flow Diagram](docs/images/finflow_event_flow_diagram.png)
 
 ---
 
-# Synthetic Data Generation
+# 7. Synthetic Data Generation
 
 All datasets are fully synthetic, generated using custom Python modules built on Pandas and NumPy.
 
@@ -140,37 +157,34 @@ Generated datasets are exported as Parquet files for efficient storage and downs
 
 ---
 
-## Data Model
+# 8. Data Model
 Star schema with 3 fact tables, 3 operational snapshot tables and 7 dimension tables.
-
 
 | Table | Type | Grain | Approx. rows |
 |---|---|---|---|
 | `dim_date` | dimension | One record per calendar date | ~3,650 rows |
-| `dim_event_type` | dimension | One record per distinct event type | 14 rows |
+| `dim_event_type` | dimension | One record per distinct event type | 16 rows |
 | `dim_product` | dimension | One record per distinct product offering | 2 rows |
 | `dim_plan` | dimension | One record per product plan variant | 4 rows |
-| `dim_user` | dimension | One record per registered user | ~500K rows |
-| `dim_wallet` | dimension | One record per user wallet account (one wallet per user) | ~500K rows |
+| `dim_user` | dimension | One record per registered user | ~500K+ rows |
+| `dim_wallet` | dimension | One record per user wallet account (one wallet per user) | ~500K+ rows |
 | `dim_transaction_type` | dimension | One record per distinct transaction type | 6 rows |
-| `fact_user_event` | fact | One record per user generated event occurence | ~12M rows |
-| `fact_investment_position` | fact | One record per investment position created by a user  | ~1.1M rows |
-| `fact_transaction` | fact | One record per money movement transaction within the application | ~5M rows |
-| `wallet_current_state` | snapshot | Latest wallet state per wallet account (based on latest pipeline run) | ~500k rows |
-| `investment_position_current_state` | snapshot | Latest investment position state  | ~1,100,000 rows |
-| `user_current_state` | snapshot | Latest user lifecycle state  | ~500k rows |
+| `fact_user_event` | fact | One record per user generated event occurence | ~45M+ rows |
+| `fact_investment_position` | snapshot fact | One record per investment position created by a user  | ~1.3M+ rows |
+| `fact_transaction` | fact | One record per money movement transaction within the application | ~9M+ rows |
+| `fact_wallet_balance` | snapshot fact | One record per wallet account | ~500k+ rows |
 
 > The full data dictionary covering all fact & dimension tables, column definitions, data types, and grain is available in [Source Data Dictionary](https://github.com/ajibola-komo/FinFlow-Product-Analytics-Engineering-Platform/blob/main/docs/documentation/data-generation/01-Finflow%20End-To-End%20Analytics%20-%20Source%20Data%20Dictionary.pdf)
 
 ---
 
-## BI Layer Strategy
+# 9. Business Intelligence Layer Strategy
 
 The project uses Power BI as the visualisation layer since it connects directly to Snowflake.
 
 This simulates a real-world semantic layer where downstream BI tools consume governed, pre-aggregated datasets rather than querying raw data sources directly.
 
-## Dashboard Preview
+## 9.1. Dashboard Preview
 
 ### Executive Dashboard
 
@@ -188,7 +202,7 @@ This simulates a real-world semantic layer where downstream BI tools consume gov
 
 [screenshot]
 
-## Key Skills Demonstrated
+# 10. Key Skills Demonstrated
 
 - Analytics Engineering
 - Product Analytics
@@ -205,7 +219,7 @@ This simulates a real-world semantic layer where downstream BI tools consume gov
 - Cohort Analysis
 - Retention Analytics
 
-## Authour
+# 11. Author
 **Ajibola Komolafe** — Analytics Engineer | Data Analyst
 - [LinkedIn](https://www.linkedin.com/in/ajibola-k-4ba921123/) 
 - [GitHub](https://github.com/ajibola-komo)
