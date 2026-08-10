@@ -861,13 +861,8 @@ def generate_facts(conn, num_of_events):
 
     active_investments_df = investments_subset_df[(investments_subset_df["tenure_days"].notna()) & (investments_subset_df["investment_status"] == "Active")].copy()
 
-    print("Total Vestable Investments:", len(vestable_investments_df))
-    print(vestable_investments_df.head())
-    print("Total Saleable Investments:", len(saleable_investments_df))
-    print(saleable_investments_df.head())
-    print("Total Active Investments:", len(active_investments_df))
-    print(active_investments_df.head())
 
+    # simulate early withdrawal requests for vestable investments based on customer behaviour segment probabilities
     vestable_investments_df["requests_early_withdrawal"] = [
         np.random.random()
     <= CUSTOMER_BEHAVIOUR_SEGMENT_MAP[segment]["early_withdrawal_probability"]
