@@ -80,11 +80,9 @@ def generate_users(conn, num_of_users):
 
     is_activated_user = np.array(demographics['is_activated_user'])
 
-    print(is_activated_user)
 
     wallet_activation_timeframe = np.array(demographics['wallet_activation_timeframe'])
 
-    print(wallet_activation_timeframe)
 
     acquisition_channels = [np.random.choice(ACQUISITION_CHANNELS, p = CUSTOMER_PERSONA_MAP[cp]['acquisition_channels_weights']) for cp in customer_personas]
 

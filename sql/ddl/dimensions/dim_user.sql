@@ -9,7 +9,7 @@ CREATE OR REPLACE TABLE dim_user(
     reported_annual_income DECIMAL(18,2) NOT NULL,
     acquisition_channel VARCHAR(20) NOT NULL,
     device_type VARCHAR(20) NOT NULL,
-    customer_persona VARCHAR(20) NOT NULL,
+    customer_persona VARCHAR(50) NOT NULL,
     kyc_completed BOOLEAN NOT NULL,
     date_of_birth DATE NOT NULL,
     birth_date_id INT NOT NULL,
