@@ -70,15 +70,13 @@ def generate_users(conn, num_of_users):
 )
     email_ids = [f"{first_name[i].lower()}.{last_name[i].lower()}{random_suffix[i]}{email_domains[i]}" for i in range(num_of_users)]
 
-    
-
     demographics = get_age_persona_income_distribution(num_of_users)
 
-    customer_personas = np.array(demographics['persona'])
+    customer_personas = demographics['persona']
 
-    reported_annual_incomes = np.array(demographics['income'])
+    reported_annual_incomes = demographics['income']
 
-    is_activated_user = np.array(demographics['is_activated_user'])
+    is_activated_user = demographics['is_activated_user']
 
 
     wallet_activation_timeframe = np.array(demographics['wallet_activation_timeframe'])
@@ -92,8 +90,10 @@ def generate_users(conn, num_of_users):
     kyc_completed[active_mask] = True #assuming all activated users completed KYC, this will set kyc_completed to True for those users
     kyc_completed[~active_mask] = np.random.choice([True, False], size=(~active_mask).sum(), p=[0.3, 0.7])
     
-    date_of_birth = np.array(demographics['birth_date'])
-    signup_date = get_signup_distribution(date_of_birth)
+    date_of_birth = pd.to_datetime(demographics['birth_date'])
+    signup_date = pd.to_datetime(get_signup_distribution(date_of_birth))
+
+    assert (signup_date >= (date_of_birth + pd.DateOffset(years = 18))).all(),"User must be at least 18 years old"
     birth_date_id = [int(pd.Timestamp(date_of_birth[i]).strftime('%Y%m%d')) for i in range(num_of_users)]
     signup_date_id = [int(pd.Timestamp(signup_date[i]).strftime('%Y%m%d')) for i in range(num_of_users)]
 
@@ -110,6 +110,7 @@ def generate_users(conn, num_of_users):
     signup_date = pd.to_datetime(signup_date)
 
     supposed_activation_dates[active_mask] = signup_date[active_mask] + pd.to_timedelta(wallet_activation_timeframe[active_mask],unit="m")
+    supposed_activation_dates[inactive_mask] = None
 
     kyc_completion_timeframe = np.empty(num_of_users, dtype=object)
     kyc_completion_dates = np.empty(num_of_users, dtype=object)
@@ -125,8 +126,8 @@ def generate_users(conn, num_of_users):
     last_login_at = signup_date
     created_at = signup_date
     last_updated_at = signup_date
-    
 
+    
     df_raw = pd.DataFrame({
         'first_name': customer_first_names,
         'last_name': customer_last_names,

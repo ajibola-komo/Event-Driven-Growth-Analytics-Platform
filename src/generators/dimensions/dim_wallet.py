@@ -10,7 +10,7 @@ def generate_list_of_wallets(conn):
     conn.execute(create_db)
 
     users_data = conn.execute('''
-            SELECT * FROM dim_user order by signup_date
+            SELECT * FROM dim_user order by signup_date ASC
     ''').df()
 
     total_users = len(users_data)
@@ -19,16 +19,20 @@ def generate_list_of_wallets(conn):
 
     user_ids = users_data["user_id"]
 
-    wallet_created_at = np.array(users_data["signup_date"])
+    wallet_created_at = users_data["signup_date"]
 
-    print(pd.isna(wallet_created_at).sum())
+    assert wallet_created_at.notna().all(), "Wallet creation date cannot be null"
 
     is_activated_user = users_data["is_activated_user"]
+
+    assert is_activated_user.notna().all(),"Activation status cannot be null"
 
     active_mask = np.where(is_activated_user == True)[0]
     inactive_mask = np.where(is_activated_user == False)[0]
 
     activation_timeframe = users_data["wallet_activation_timeframe"]
+
+    assert (activation_timeframe[active_mask] > 0).all(), "activation timeframe must be greater than 0"
 
     wallet_activated_at = np.empty(
         total_users,
@@ -39,13 +43,15 @@ def generate_list_of_wallets(conn):
     wallet_activated_at[active_mask] = np.array([ca + pd.to_timedelta(int(ro),unit="m") for ca,ro in zip(wallet_created_at[active_mask], activation_timeframe[active_mask])])
     wallet_activated_at[inactive_mask] = None
 
+    assert (wallet_created_at[active_mask] < wallet_activated_at[active_mask]).all(),"Wallet cannot be activated before creation"
+
     wallet_activated_at_id = np.empty(total_users,
         dtype=object)
 
     wallet_created_at_id = [int(pd.Timestamp(wallet_created_at[i]).strftime('%Y%m%d')) for i in range(total_users)]
     wallet_activated_at_id[active_mask] = [int(pd.Timestamp(i).strftime('%Y%m%d')) for i in wallet_activated_at[active_mask]]
 
-    wallet_currency = np.array(["GBP"] * total_users)
+    wallet_currency = "GBP"
 
     created_at = wallet_created_at
     last_updated_at = created_at
