@@ -51,8 +51,12 @@ def get_last_login(conn, uids):
 
     return login_info
 
-def kyc_completion_events(conn,start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids):
+def kyc_activation_events(conn,start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids):
+
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position]= event_time
     device_types[start_position:end_position] = dtypes
+    
+    event_type_id = conn.execute('''select event_type_id from dim_event_type where event_type_code = 'kyc_completed' ''').fetchone()[0]
+    event_type_ids[start_position:end_position] = event_type_id
     

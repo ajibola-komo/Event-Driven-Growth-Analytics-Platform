@@ -142,24 +142,28 @@ def generate_facts(conn, num_of_events):
 
     kyc_logins_timeframe = kyc_activation_timeframe - 300 #assuming KYC completion happens after the last login, we can set the KYC activation timeframe to be slightly more than the last login timeframe
 
-    start_kyc_activations = end_position
-    end_kyc_activations = start_kyc_activations + len(kyc_completed_users)
 
-    user_ids[start_kyc_activations:end_kyc_activations] = kyc_completed_users["user_id"]
-    event_time[start_kyc_activations:end_kyc_activations] = [last_login_map.get(uid,signup_map.get(uid)) + timedelta(minutes=int(ro)) for uid, ro in zip(kyc_completed_users["user_id"], kyc_logins_timeframe)]
-    event_type_ids[start_kyc_activations:end_kyc_activations] = event_type_map.get("app_login")
-    device_types[start_kyc_activations:end_kyc_activations] = np.array([device_type_map.get(uid) for uid in kyc_completed_users["user_id"]])
-    update_last_login_timestamp(conn, kyc_completed_users["user_id"], event_time[start_kyc_activations:end_kyc_activations])
 
-    start_kyc_activation_completion = end_kyc_activations
-    end_kyc_activation_completion = start_kyc_activation_completion + len(kyc_completed_users)
+    # start activation by logging in
+    start_position = end_position
+    end_position = start_position + len(kyc_completed_users)
 
-    user_ids[start_kyc_activation_completion:end_kyc_activation_completion] = kyc_completed_users["user_id"]
-    event_time[start_kyc_activation_completion:end_kyc_activation_completion] = [last_login_map.get(uid,signup_map.get(uid)) + timedelta(minutes=int(ro)) for uid, ro in zip(kyc_completed_users["user_id"], kyc_activation_timeframe)]
+    dtypes = [device_type_map.get(uid) for uid in kyc_completed_users["device_type"]]
+    etime = [last_login_map.get(uid,signup_map.get(uid)) + timedelta(minutes=int(ro)) for uid, ro in zip(kyc_completed_users["user_id"], kyc_logins_timeframe)]
+
+    app_login_events(conn, start_position, end_position, user_ids,kyc_completed_users["user_id"],event_time,etime,device_types,dtypes,event_type_ids)
+
+
+    #activate kyc
+    start_position = end_position
+    end_position = start_position + len(kyc_completed_users)
+
+    
+    etime = [last_login_map.get(uid,signup_map.get(uid)) + timedelta(minutes=int(ro)) for uid, ro in zip(kyc_completed_users["user_id"], kyc_activation_timeframe)]
     event_type_ids[start_kyc_activation_completion:end_kyc_activation_completion] = event_type_map.get("kyc_completed")
     device_types[start_kyc_activation_completion:end_kyc_activation_completion] = np.array([device_type_map.get(uid) for uid in kyc_completed_users["user_id"]])
 
-    kyc_completion_time = event_time[start_kyc_activation_completion:end_kyc_activation_completion]
+    
 
     #wallet activation
     wallet_activated_users = kyc_completed_users[~pd.isna(kyc_completed_users["wallet_activation_timeframe"])].copy()
