@@ -2,13 +2,13 @@ import numpy as np
 import pandas as pd
 from src.config.paths import (DDL_FACT_USER_EVENT_PATH, FACT_USER_EVENT_PARQUET_PATH, 
                               FACT_INVESTMENT_POSITION_PARQUET_PATH, DDL_FACT_INVESTMENT_POSITION_PATH, DDL_FACT_TRANSACTION_PATH, FACT_TRANSACTION_PARQUET_PATH)
-from src.config.constants import (DEFAULT_TRANSACTION_START_DATE,IMMEDIATE_LOGINS_TIME_FRAME, KYC_ACTIVATION_TIMEFRAME, USERS_MAKES_FIRST_INVESTMENT_AFTER_FUNDING,
+from src.config.constants import (DEFAULT_TRANSACTION_START_DATE, DEFAULT_TRANSACTION_END_DATE, IMMEDIATE_LOGINS_TIME_FRAME, KYC_ACTIVATION_TIMEFRAME, USERS_MAKES_FIRST_INVESTMENT_AFTER_FUNDING,
                                   CUSTOMER_BEHAVIOUR_SEGMENT_MAP, FIRST_INVESTMENT_TYPE, EARLY_WITHDRAWAL_BEHAVIOUR, INVESTMENT_WITHDRAWAL_PROCESSING_TIME,
                                   MUTUAL_FUNDS_CUTOFF_DATE, TODAY
                                   )
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
-from src.logic.helper_functions import (update_last_login_timestamp)
+from src.logic.helper_functions import (update_last_login_timestamp, signup_completion_events, app_login_events, get_last_login)
 
 
 def generate_facts(conn, num_of_events):
@@ -68,39 +68,49 @@ def generate_facts(conn, num_of_events):
     transaction_amounts = np.zeros(num_of_events, dtype=np.float64)
     transaction_statuses = np.empty(num_of_events, dtype = object)
     is_withdrawn_early = np.full(num_of_events,False,dtype=bool)
-    withdrawal_date = np.empty(num_of_events,dtype=object)
-    withdrawal_date_id = np.empty(num_of_events,dtype=object)
-    
-    wallet_balance_by_user_df = user_wallet_data[
-    ["user_id", "wallet_id"]].copy()
+    early_withdrawal_dates = np.empty(num_of_events,dtype=object)
+    early_withdrawal_date_id = np.empty(num_of_events, dtype=object)
 
-    wallet_balance_by_user_df["current_balance"] = 0.0
 
     # new user signups
     total_signups = len(users_data)
 
-    user_ids[:total_signups] = users_data["user_id"]
-    event_time[:total_signups] = users_data["signup_date"]
-    event_type_ids[:total_signups] = event_type_map.get("signup_completed")
-    device_types[:total_signups] = np.array([device_type_map.get(uid) for uid in users_data["user_id"]])
+    start_position = 0
+    end_position = total_signups
+
+    dtypes = np.array([device_type_map.get(uid) for uid in users_data["user_id"]])
+
+    signup_completion_events(conn,
+                             start_position, 
+                             end_position, 
+                             user_ids, 
+                             users_data["user_id"], 
+                             event_time, 
+                             users_data["signup_date"],
+                             device_types, 
+                             dtypes,
+                             event_type_ids)
+
+    
 
     #new user logins
     new_users_logins = conn.execute(f'''SELECT user_id, signup_date, kyc_completed, is_activated_user, customer_behaviour_segment FROM dim_user
-    where signup_date >= '{DEFAULT_TRANSACTION_START_DATE}' AND is_immediate_login = True order by signup_date''').df()
+    where signup_date between '{DEFAULT_TRANSACTION_START_DATE}' and '{DEFAULT_TRANSACTION_END_DATE}' AND is_immediate_login = True order by signup_date''').df()
     
     immediate_login_timeframe = np.random.randint(IMMEDIATE_LOGINS_TIME_FRAME[0],IMMEDIATE_LOGINS_TIME_FRAME[1], size=len(new_users_logins))
     
     total_new_users = len(new_users_logins)
 
-    start_immediate_logins = total_signups
-    end_immediate_logins = start_immediate_logins + total_new_users
+    start_position = total_signups
+    end_position = start_position + total_new_users
 
-    user_ids[start_immediate_logins:end_immediate_logins] = new_users_logins["user_id"]
-    event_time[start_immediate_logins:end_immediate_logins] = [pd.Timestamp(sd) + timedelta(seconds=int(ro)) for sd, ro in zip(new_users_logins["signup_date"], immediate_login_timeframe)]
-    event_type_ids[start_immediate_logins:end_immediate_logins] = event_type_map.get("app_login")
-    device_types[start_immediate_logins:end_immediate_logins] = np.array([device_type_map.get(uid) for uid in new_users_logins["user_id"]])
-    update_last_login_timestamp(conn, new_users_logins["user_id"], event_time[start_immediate_logins:end_immediate_logins])
+    etime = [pd.Timestamp(sd) + timedelta(seconds=int(ro)) for sd, ro in zip(new_users_logins["signup_date"], immediate_login_timeframe)]
+    uids = new_users_logins["signup_date"]
+    dtypes=[device_type_map.get(uid) for uid in uids]
 
+    app_login_events(conn,start_position, end_position,
+                     user_ids,uids,event_time,etime,device_types,dtypes, event_type_ids)
+    
     #kyc_completed_users
     kyc_completed_users = users_data[users_data["kyc_completed"] == True].copy()
 
@@ -109,9 +119,14 @@ def generate_facts(conn, num_of_events):
     users_data["signup_date"]
 ))
 
+    
+    last_login_df = get_last_login(conn,kyc_completed_users["user_id"])
+    uids = last_login_df["user_id"]
+    last_login_time = last_login_df["last_login_at"]
+
     last_login_map  = dict(zip(
-        user_ids[start_immediate_logins:end_immediate_logins],
-        event_time[start_immediate_logins:end_immediate_logins]
+        uids,
+        last_login_time
     ))
 
     kyc_activation_timeframe = np.empty(len(kyc_completed_users), dtype=object)
@@ -127,7 +142,7 @@ def generate_facts(conn, num_of_events):
 
     kyc_logins_timeframe = kyc_activation_timeframe - 300 #assuming KYC completion happens after the last login, we can set the KYC activation timeframe to be slightly more than the last login timeframe
 
-    start_kyc_activations = end_immediate_logins
+    start_kyc_activations = end_position
     end_kyc_activations = start_kyc_activations + len(kyc_completed_users)
 
     user_ids[start_kyc_activations:end_kyc_activations] = kyc_completed_users["user_id"]

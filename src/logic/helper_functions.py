@@ -14,3 +14,45 @@ def update_last_login_timestamp(conn, user_ids, last_login):
     ''')
 
     conn.unregister('logins_df')
+
+
+def signup_completion_events(conn,start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids ):
+    user_ids[start_position:end_position] = uids
+    event_times[start_position:end_position]= event_time
+    device_types[start_position:end_position] = dtypes
+
+    event_type_id = conn.execute('''select event_type_id from dim_event_type where event_type_code = 'signup_completed' ''').fetchone()[0]
+    event_type_ids[start_position:end_position] = event_type_id
+
+
+def app_login_events(conn,start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids):
+    user_ids[start_position:end_position] = uids
+    event_times[start_position:end_position]= event_time
+    device_types[start_position:end_position] = dtypes
+
+    event_type_id = conn.execute('''select event_type_id from dim_event_type where event_type_code = 'app_login' ''').fetchone()[0]
+    event_type_ids[start_position:end_position] = event_type_id
+
+    update_last_login_timestamp(conn, uids,event_time)
+
+
+def get_last_login(conn, uids):
+
+    conn.register('uids',uids)
+
+    login_info = conn.execute(''' SELECT
+            u.user_id,
+            u.last_login_at
+        FROM dim_user AS u
+        INNER JOIN uids AS ids
+            ON u.user_id = ids.user_id ''').df()
+
+    conn.unregister('uids')
+
+    return login_info
+
+def kyc_completion_events(conn,start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids):
+    user_ids[start_position:end_position] = uids
+    event_times[start_position:end_position]= event_time
+    device_types[start_position:end_position] = dtypes
+    
