@@ -178,14 +178,6 @@ def generate_facts(conn, num_of_events):
     )
     
 
-    wallet_activated_users_df = pd.DataFrame(
-        {
-            "user_id": user_ids[start_wallet_activations:end_wallet_activations],
-            "last_login_time": event_time[start_wallet_activations:end_wallet_activations],
-            "current_wallet_balance": amount_invested[start_wallet_activations:end_wallet_activations]
-        }
-    )
-
     #let's create the initial investment -- login, review_plan_options then drop off for some users, and for others, they will make an investment after reviewing the plan options. We will create a new dataframe to hold the users who made an investment and their corresponding investment details.
 
     wallet_activated_users_df = pd.DataFrame({
