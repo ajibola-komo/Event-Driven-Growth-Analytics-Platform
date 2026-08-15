@@ -9,7 +9,7 @@ from src.config.constants import (DEFAULT_TRANSACTION_START_DATE, DEFAULT_TRANSA
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from src.logic.helper_functions import (update_last_login_timestamp, signup_completion_events, app_login_events, get_last_login, kyc_completion_events,
-                                        wallet_activation_events, get_current_wallet_balance)
+                                        wallet_activation_events, get_current_wallet_balance, review_plan_options_events)
 from src.logic.EventContext import (load_event_context)
 
 
@@ -206,7 +206,7 @@ def generate_facts(conn, num_of_events):
     wallet_activated_users_df = wallet_activated_users_df.merge(last_login, on = "user_id",how="inner")
 
     #these users will just login and review plan options, but will not make an investment. We will create a new dataframe to hold the users who made an investment and their corresponding investment details.
-    
+
     
     customer_subset_1 = wallet_activated_users_df.sample(frac = 0.55, random_state=1)
 
@@ -216,21 +216,20 @@ def generate_facts(conn, num_of_events):
     start_position = end_position
     end_position = start_position + total_customer_subset_1
 
-    user_ids[start_position:end_position] = customer_subset_1["user_id"]
-    event_time[start_position:end_position] = [last_login + timedelta(minutes=np.random.randint(5, 80)) for last_login in customer_subset_1["last_login_time"]]
-    event_type_ids[start_position:end_position] = event_type_map.get("app_login")
-    device_types[start_position:end_position] = np.array([device_type_map.get(uid) for uid in customer_subset_1["user_id"]])
-    update_last_login_timestamp(conn, customer_subset_1["user_id"], event_time[start_position:end_position])
+    uids = customer_subset_1["user_id"]
 
-    login_time_for_review_plan_options = event_time[start_position:end_position]
+    etime = [last_login + timedelta(minutes=np.random.randint(5, 80)) for last_login in customer_subset_1["last_login_at"]]
+    dtypes = np.array([device_type_map.get(uid) for uid in customer_subset_1["user_id"]])
+    app_login_events(conn, context, start_position, end_position, user_ids, uids, event_time,etime, device_types, dtypes, event_type_ids)
+
 
     start_position = end_position
     end_position = start_position + total_customer_subset_1
 
-    user_ids[start_position:end_position] = customer_subset_1["user_id"]
-    event_time[start_position:end_position] = [last_login + timedelta(minutes=np.random.randint(2, 5)) for last_login in login_time_for_review_plan_options]
-    event_type_ids[start_position:end_position] = event_type_map.get("review_plan_options")
-    device_types[start_position:end_position] = np.array([device_type_map.get(uid) for uid in customer_subset_1["user_id"]])
+    uids = customer_subset_1["user_id"]
+    dtypes = np.array([device_type_map.get(uid) for uid in customer_subset_1["user_id"]])
+
+    review_plan_options_events(conn,context,start_position, end_position, user_ids, uids, event_time, event_type_ids, device_types, dtypes)
 
     customer_behaviour_segment_wallet_activated_users = wallet_activated_users_df['customer_behaviour_segment']
 
@@ -267,24 +266,25 @@ def generate_facts(conn, num_of_events):
 
     total_customer_subset_2 = len(customer_subset_2)
 
-    start_position = end_position
-    end_position = start_position + total_customer_subset_2
+    #The user creates first investment here
 
-    user_ids[start_position:end_position] = customer_subset_2["user_id"]
-    event_time[start_position:end_position] = [last_login + timedelta(minutes=np.random.randint(0, mtft)) for last_login,mtft in zip(customer_subset_2["last_login_time"],customer_subset_2["mins_to_first_investment"])]
-    event_type_ids[start_position:end_position] = event_type_map.get("app_login")
-    device_types[start_position:end_position] = np.array([device_type_map.get(uid) for uid in customer_subset_2["user_id"]])
-    update_last_login_timestamp(conn, customer_subset_2["user_id"], event_time[start_position:end_position])
-
-    login_time_for_review_plan_options_2 = event_time[start_position:end_position]
+    #logs in first
 
     start_position = end_position
     end_position = start_position + total_customer_subset_2
 
-    user_ids[start_position:end_position] = customer_subset_2["user_id"]
-    event_time[start_position:end_position] = [last_login + timedelta(minutes=np.random.randint(2, 5)) for last_login in login_time_for_review_plan_options_2]
-    event_type_ids[start_position:end_position] = event_type_map.get("review_plan_options")
-    device_types[start_position:end_position] = np.array([device_type_map.get(uid) for uid in customer_subset_2["user_id"]])
+    uids = customer_subset_2["user_id"]
+    etime = [last_login + timedelta(minutes=np.random.randint(0, mtft)) for last_login,mtft in zip(customer_subset_2["last_login_at"],customer_subset_2["mins_to_first_investment"])]
+    dtypes = np.array([device_type_map.get(uid) for uid in customer_subset_2["user_id"]])
+    app_login_events(conn, context, start_position, end_position, user_ids, uids, event_time, etime, device_types, dtypes, event_type_ids)
+
+    start_position = end_position
+    end_position = start_position + total_customer_subset_2
+
+    uids = customer_subset_2["user_id"]
+    dtypes = np.array([device_type_map.get(uid) for uid in customer_subset_2["user_id"]])
+
+    review_plan_options_events(conn,context, start_position, end_position, user_ids, uids, event_time, event_type_ids, device_types, dtypes)
 
     last_review_time_for_investment = event_time[start_position:end_position]
 

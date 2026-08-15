@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-
+from datetime import timedelta
 
 
 
@@ -146,6 +146,19 @@ def get_current_wallet_balance(conn, uids):
         conn.unregister('uids_df')
 
     return current_balances
+
+def review_plan_options_events(conn, context, start_position, end_position, user_ids, uids, event_times, event_type_ids, device_types, dtypes):
+
+    login_info = get_last_login(conn, uids)
+
+    user_ids[start_position:end_position] = uids
+    event_times[start_position:end_position] = [last_login + timedelta(minutes=np.random.randint(2, 5)) for last_login in login_info["last_login_at"]]
+    device_types[start_position:end_position] = dtypes
+    event_type_ids[start_position:end_position] = context.review_plan_options_event_type_id
+
+#def plan_selection_events(conn, context)
+
+
 
 
     
