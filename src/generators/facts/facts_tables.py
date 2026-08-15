@@ -10,9 +10,12 @@ from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from src.logic.helper_functions import (update_last_login_timestamp, signup_completion_events, app_login_events, get_last_login, kyc_completion_events,
                                         wallet_activation_events)
+from src.logic.EventContext import (load_event_context)
 
 
 def generate_facts(conn, num_of_events):
+
+    context = load_event_context(conn)
 
     create_fact_user_table = DDL_FACT_USER_EVENT_PATH.read_text()
     create_fact_investment_table = DDL_FACT_INVESTMENT_POSITION_PATH.read_text()
@@ -66,6 +69,10 @@ def generate_facts(conn, num_of_events):
 
     investment_ids = np.empty(num_of_events, dtype=object)
 
+    last_transaction_id = 0
+
+    #event_ids = np.empty(num_of_events, dtype=np.int64)
+
     transaction_amounts = np.zeros(num_of_events, dtype=np.float64)
     transaction_statuses = np.empty(num_of_events, dtype = object)
     is_withdrawn_early = np.full(num_of_events,False,dtype=bool)
@@ -81,7 +88,7 @@ def generate_facts(conn, num_of_events):
 
     dtypes = np.array([device_type_map.get(uid) for uid in users_data["user_id"]])
 
-    signup_completion_events(conn,start_position, end_position, user_ids, users_data["user_id"], event_time, users_data["signup_date"],device_types, dtypes,event_type_ids)
+    signup_completion_events(context, start_position, end_position, user_ids, users_data["user_id"], event_time, users_data["signup_date"],device_types, dtypes,event_type_ids)
 
     #new user logins
     new_users_logins = conn.execute(f'''SELECT user_id, signup_date, kyc_completed, is_activated_user, customer_behaviour_segment FROM dim_user
@@ -98,7 +105,7 @@ def generate_facts(conn, num_of_events):
     uids = new_users_logins["user_id"]
     dtypes=[device_type_map.get(uid) for uid in uids]
 
-    app_login_events(conn,start_position, end_position,
+    app_login_events(conn,context,start_position, end_position,
                      user_ids,uids,event_time,etime,device_types,dtypes, event_type_ids)
     
     #kyc_completed_users
@@ -135,7 +142,7 @@ def generate_facts(conn, num_of_events):
     dtypes = [device_type_map.get(uid) for uid in kyc_completed_users["user_id"]]
     etime = [last_login_map.get(uid,signup_map.get(uid)) + timedelta(minutes=int(ro)) for uid, ro in zip(kyc_completed_users["user_id"], kyc_logins_timeframe)]
 
-    app_login_events(conn, start_position, end_position, user_ids,kyc_completed_users["user_id"],event_time,etime,device_types,dtypes,event_type_ids)
+    app_login_events(conn, context, start_position, end_position, user_ids,kyc_completed_users["user_id"],event_time,etime,device_types,dtypes,event_type_ids)
 
 
     #activate kyc
@@ -145,7 +152,8 @@ def generate_facts(conn, num_of_events):
     etime = [signup_map.get(uid) + timedelta(minutes=int(ro)) for uid, ro in zip(kyc_completed_users["user_id"], kyc_activation_timeframe)]
     dtypes = np.array([device_type_map.get(uid) for uid in kyc_completed_users["user_id"]])
 
-    kyc_completion_events(conn, start_position, end_position, user_ids, kyc_completed_users["user_id"], event_time, etime, dtypes, event_type_ids)
+    kyc_completion_events(conn, context, start_position, end_position, user_ids, kyc_completed_users["user_id"], 
+                          event_time, etime, device_types, dtypes, event_type_ids)
 
 
     #wallet activation
@@ -172,9 +180,10 @@ def generate_facts(conn, num_of_events):
     dtypes = np.array([device_type_map.get(uid) for uid in wallet_activated_users["user_id"]])
     wids = [wallet_id_map.get(uid) for uid in wallet_activated_users["user_id"]]
     
-    last_transaction_id = wallet_activation_events(conn, start_position, end_position,user_ids, wallet_activated_users["user_id"], event_time, etime,
+    last_transaction_id = wallet_activation_events(
+        conn, context, start_position, end_position,user_ids, wallet_activated_users["user_id"], event_time, etime,
     device_types, dtypes, event_type_ids, wallet_ids, wids, is_money_movement_activities, transaction_type_ids, transaction_ids, transaction_amounts,
-    wallet_activated_users["amount_invested"],transaction_statuses
+    wallet_activated_users["amount_invested"],transaction_statuses, last_transaction_id
     )
     
 
@@ -193,7 +202,7 @@ def generate_facts(conn, num_of_events):
 
     #these users will just login and review plan options, but will not make an investment. We will create a new dataframe to hold the users who made an investment and their corresponding investment details.
 
-    start_position = end_wallet_activations
+    start_position = end_position
     end_position = start_position + total_customer_subset_1
 
     user_ids[start_position:end_position] = customer_subset_1["user_id"]

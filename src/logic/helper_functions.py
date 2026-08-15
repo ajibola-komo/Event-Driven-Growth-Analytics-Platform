@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 
+
+
+
 def update_last_login_timestamp(conn, user_ids, last_login):
 
     logins_df = pd.DataFrame({
@@ -17,49 +20,50 @@ def update_last_login_timestamp(conn, user_ids, last_login):
     conn.unregister('logins_df')
 
 
-def signup_completion_events(conn,start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids ):
+def signup_completion_events(context, start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids ):
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position]= event_time
     device_types[start_position:end_position] = dtypes
 
-    event_type_id = conn.execute('''select event_type_id from dim_event_type where event_type_code = 'signup_completed' ''').fetchone()[0]
-    event_type_ids[start_position:end_position] = event_type_id
+    event_type_ids[start_position:end_position] = context.signup_completed_event_type_id
 
 
-def app_login_events(conn,start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids):
+def app_login_events(conn,context, start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids):
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position]= event_time
     device_types[start_position:end_position] = dtypes
 
-    event_type_id = conn.execute('''select event_type_id from dim_event_type where event_type_code = 'app_login' ''').fetchone()[0]
-    event_type_ids[start_position:end_position] = event_type_id
+    event_type_ids[start_position:end_position] = context.app_login_event_type_id
 
     update_last_login_timestamp(conn, uids,event_time)
 
 
 def get_last_login(conn, uids):
 
-    conn.register('uids',uids)
+    uids_df = pd.DataFrame({"user_id": uids})
+
+    conn.register('uids_df',uids_df)
 
     login_info = conn.execute(''' SELECT
             u.user_id,
             u.last_login_at
         FROM dim_user AS u
-        INNER JOIN uids AS ids
+        INNER JOIN uids_df AS ids
             ON u.user_id = ids.user_id ''').df()
 
-    conn.unregister('uids')
+    conn.unregister('uids_df')
 
     return login_info
 
-def kyc_completion_events(conn,start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids):
+def kyc_completion_events(conn,context,start_position, end_position, user_ids, uids, 
+                          event_times,event_time,device_types,dtypes,event_type_ids):
 
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position]= event_time
     device_types[start_position:end_position] = dtypes
     
-    event_type_id = conn.execute('''select event_type_id from dim_event_type where event_type_code = 'kyc_completed' ''').fetchone()[0]
-    event_type_ids[start_position:end_position] = event_type_id
+    
+    event_type_ids[start_position:end_position] = context.kyc_completed_event_type_id
 
     kyc_activation_df = pd.DataFrame({
         'user_id':uids,
@@ -73,19 +77,22 @@ def kyc_completion_events(conn,start_position, end_position, user_ids, uids, eve
     conn.unregister('kyc_activation_df')
 
 
-def wallet_activation_events(conn, start_position, end_position, user_ids, uids, event_times, event_time, device_types,dtypes,event_type_ids, wallet_ids, wids, is_money_movement_activity, transaction_type_ids, transaction_ids, transaction_amounts,tran_amount, transaction_statuses):
+def wallet_activation_events(conn, context, start_position, end_position, 
+                             user_ids, uids, event_times, event_time, device_types,dtypes,
+                             event_type_ids, wallet_ids, wids, is_money_movement_activity,
+                            transaction_type_ids, transaction_ids, transaction_amounts,tran_amount, 
+                            transaction_statuses, last_transaction_id):
 
-    last_transaction_id = conn.execute(''' SELECT coalesce(max(transaction_id),0) from fact_transaction ''').fetchone()[0]
-
+    
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position] = event_time
     device_types[start_position:end_position] = dtypes
 
-    event_type_id = conn.execute('''select event_type_id from dim_event_type where event_type_code = 'wallet_funded' ''').fetchone()[0]
-    event_type_ids[start_position:end_position] = event_type_id
+    
+    event_type_ids[start_position:end_position] = context.wallet_funded_event_type_id
 
-    transaction_type_id = conn.execute(''' select transaction_type_id from dim_transaction_type where transaction_type_code = 'wallet_funding' ''').fetchone()[0]
-    transaction_type_ids[start_position:end_position] = transaction_type_id
+    
+    transaction_type_ids[start_position:end_position] = context.wallet_funding_transaction_type_id
 
     wallet_ids[start_position:end_position] = wids
 
@@ -93,10 +100,35 @@ def wallet_activation_events(conn, start_position, end_position, user_ids, uids,
 
     transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id + len(uids) + 1)
 
+    tran_ids = transaction_ids[start_position:end_position]
+
     transaction_amounts[start_position:end_position] = tran_amount
 
     transaction_statuses[start_position:end_position] = "success"
 
     last_transaction_id = transaction_ids[start_position:end_position].max()
 
+    update_wallet_balance(conn, uids, tran_amount, tran_ids, event_time)
+
     return last_transaction_id
+
+
+def update_wallet_balance(conn, uids, transaction_amount, transaction_ids, event_time):
+
+    wallet_activation_df = pd.DataFrame({
+            'user_id':uids,
+            'transaction_amount':transaction_amount,
+            'last_transaction_id':transaction_ids,
+            'last_updated_at':event_time
+        })
+    
+    conn.register('wallet_activation_df', wallet_activation_df)
+    
+    conn.execute(''' UPDATE fact_wallet_balance as f set current_balance = current_balance + w.transaction_amount,
+                        last_updated_at = w.last_updated_at, updated_at = w.last_updated_at, last_updated_at_id = CAST(strftime(w.last_updated_at, '%Y%m%d') AS BIGINT),
+                        last_transaction_id = w.last_transaction_id from wallet_activation_df as w WHERE f.user_id = w.user_id 
+              ''') 
+    
+    conn.unregister('wallet_activation_df')
+    
+
