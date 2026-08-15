@@ -189,6 +189,8 @@ def generate_facts(conn, num_of_events):
 
     #let's create the initial investment -- login, review_plan_options then drop off for some users, and for others, they will make an investment after reviewing the plan options. We will create a new dataframe to hold the users who made an investment and their corresponding investment details.
 
+    
+
     wallet_activated_users_df = pd.DataFrame({
         "user_id": wallet_activated_users_df["user_id"],
         "customer_behaviour_segment": wallet_activated_users_df["user_id"].map(segment_customers),

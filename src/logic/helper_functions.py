@@ -130,5 +130,21 @@ def update_wallet_balance(conn, uids, transaction_amount, transaction_ids, event
               ''') 
     
     conn.unregister('wallet_activation_df')
+
+def get_current_wallet_balance(conn, uids):
+
+    uids_df = pd.DataFrame({
+        'user_id':uids
+    })
+
+    conn.register('uids_df',uids_df)
+
+    try:
+        users_current_balance_df = conn.execute('''SELECT w.user_id, w.current_balance from fact_wallet_balance w inner join
+        uids_df u on w.user_id = u.user_id ''').df()
+    finally:
+        conn.unregister('uids_df')
+
+    return users_current_balance_df
     
 
