@@ -9,7 +9,7 @@ from src.config.constants import (DEFAULT_TRANSACTION_START_DATE, DEFAULT_TRANSA
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from src.logic.helper_functions import (update_last_login_timestamp, signup_completion_events, app_login_events, get_last_login, kyc_completion_events,
-                                        wallet_activation_events)
+                                        wallet_activation_events, get_current_wallet_balance)
 from src.logic.EventContext import (load_event_context)
 
 
@@ -188,22 +188,31 @@ def generate_facts(conn, num_of_events):
     
 
     #let's create the initial investment -- login, review_plan_options then drop off for some users, and for others, they will make an investment after reviewing the plan options. We will create a new dataframe to hold the users who made an investment and their corresponding investment details.
-
     
+    uids = wallet_activated_users["user_id"]
+
+    current_balances = get_current_wallet_balance(conn, uids)
+
+    last_login = get_last_login(conn, uids)
+
 
     wallet_activated_users_df = pd.DataFrame({
-        "user_id": wallet_activated_users_df["user_id"],
-        "customer_behaviour_segment": wallet_activated_users_df["user_id"].map(segment_customers),
-        "last_login_time": wallet_activated_users_df["last_login_time"],
-        "current_wallet_balance":wallet_activated_users_df["current_wallet_balance"]
+        "user_id": uids,
+        "customer_behaviour_segment": uids.map(segment_customers),
         })
+
+    #current balance and last_login_at
+    wallet_activated_users_df = wallet_activated_users_df.merge(current_balances,on = "user_id", how="inner")
+    wallet_activated_users_df = wallet_activated_users_df.merge(last_login, on = "user_id",how="inner")
+
+    #these users will just login and review plan options, but will not make an investment. We will create a new dataframe to hold the users who made an investment and their corresponding investment details.
+    
     
     customer_subset_1 = wallet_activated_users_df.sample(frac = 0.55, random_state=1)
 
     total_customer_subset_1 = len(customer_subset_1)
 
-    #these users will just login and review plan options, but will not make an investment. We will create a new dataframe to hold the users who made an investment and their corresponding investment details.
-
+    
     start_position = end_position
     end_position = start_position + total_customer_subset_1
 

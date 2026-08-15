@@ -140,11 +140,13 @@ def get_current_wallet_balance(conn, uids):
     conn.register('uids_df',uids_df)
 
     try:
-        users_current_balance_df = conn.execute('''SELECT w.user_id, w.current_balance from fact_wallet_balance w inner join
+        current_balances = conn.execute('''SELECT w.user_id, w.current_balance from fact_wallet_balance w inner join
         uids_df u on w.user_id = u.user_id ''').df()
     finally:
         conn.unregister('uids_df')
 
-    return users_current_balance_df
+    return current_balances
+
+
     
 
