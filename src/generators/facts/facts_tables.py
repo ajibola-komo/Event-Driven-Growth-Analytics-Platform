@@ -9,7 +9,7 @@ from src.config.constants import (DEFAULT_TRANSACTION_START_DATE, DEFAULT_TRANSA
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from src.logic.helper_functions import (update_last_login_timestamp, signup_completion_events, app_login_events, get_last_login, kyc_completion_events,
-                                        wallet_activation_events, get_current_wallet_balance, review_plan_options_events)
+                                        wallet_activation_events, get_current_wallet_balance, review_plan_options_events, plan_selection_events)
 from src.logic.EventContext import (load_event_context)
 
 
