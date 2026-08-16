@@ -286,18 +286,19 @@ def generate_facts(conn, num_of_events):
 
     review_plan_options_events(conn,context, start_position, end_position, user_ids, uids, event_time, event_type_ids, device_types, dtypes)
 
-    last_review_time_for_investment = event_time[start_position:end_position]
+    plan_review_time = event_time[start_position:end_position]
 
     start_position = end_position
     end_position = start_position + total_customer_subset_2
 
-    user_ids[start_position:end_position] = customer_subset_2["user_id"]
-    event_time[start_position:end_position] = [last_review + timedelta(minutes=np.random.randint(1, 3)) for last_review in last_review_time_for_investment]
-    event_type_ids[start_position:end_position] = event_type_map.get("plan_selected")
-    device_types[start_position:end_position] = np.array([device_type_map.get(uid) for uid in customer_subset_2["user_id"]])
+    uids = customer_subset_2["user_id"]
+    dtypes = np.array([device_type_map.get(uid) for uid in customer_subset_2["user_id"]])
+    
 
+    plan_selection_time_df = plan_selection_events(conn, context, start_position, end_position, 
+                                                   user_ids, uids, event_time, plan_review_time, event_type_ids, device_types, dtypes)
 
-    last_plan_selected_time = event_time[start_position:end_position]
+    
 
     start_position = end_position
     end_position = start_position + total_customer_subset_2
