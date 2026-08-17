@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from datetime import timedelta
+from src.config.constants import (CUSTOMER_BEHAVIOUR_SEGMENT_MAP)
 
 
 
@@ -156,7 +157,7 @@ def review_plan_options_events(conn, context, start_position, end_position, user
     device_types[start_position:end_position] = dtypes
     event_type_ids[start_position:end_position] = context.review_plan_options_event_type_id
 
-def plan_selection_events(conn, context, start_position, end_position, user_ids, uids, event_time, plan_review_time, event_type_ids, device_types, dtypes):
+def plan_selection_events(context, start_position, end_position, user_ids, uids, event_time, plan_review_time, event_type_ids, device_types, dtypes):
 
     random_offset = np.random.randint(1,3,size=len(uids))
     plan_selection_time = [review_time + timedelta(minutes=ro) for review_time, ro in zip(plan_review_time, random_offset)]
@@ -173,6 +174,120 @@ def plan_selection_events(conn, context, start_position, end_position, user_ids,
 
     return plan_selection_df
 
+
+def plan_ids_allocation(conn, context, uids, investment_type, plan_selection_time):
+
+    savings_plans = conn.execute('''select plan_id, plan_weight from dim_plan where plan_category = 'Savings' ''').df()
+
+    investment_plans = conn.execute('''select plan_id, plan_weight from dim_plan where plan_category = 'Investments' ''').df()
+
+    total_plans = len(uids)
+
+    plan_id = np.empty(total_plans, dtype=np.int64)
+
+    event_type_ids = np.empty(total_plans, dtype=np.int64)
+
+    transaction_types_ids = context.investment_funding_transaction_type_id
+
+    plan_ids_allocation_df = pd.DataFrame({
+        'user_id':uids,
+        'investment_type':investment_type,
+        'plan_id':plan_id,
+        'plan_selection_time':plan_selection_time,
+        'event_type_id':event_type_ids,
+        'transaction_type_id':transaction_types_ids
+    })
+
+    savings_mask = plan_ids_allocation_df["investment_type"] == "Savings"
+    investment_mask = plan_ids_allocation_df["investment_type"] == "Investment"
+
+    plan_ids_allocation_df.loc[savings_mask,"plan_id"] = np.random.choice(savings_plans["plan_id"], 
+                                                                           p = savings_plans["plan_weight"] / savings_plans["plan_weight"].sum(),
+                                                                           size=savings_mask.sum())
+                                                                           
+
+    plan_ids_allocation_df.loc[savings_mask,"event_type_id"] = context.savings_plan_created_event_type_id
+    plan_ids_allocation_df.loc[investment_mask,"event_type_id"] = context.investment_plan_created_event_type_id
+
+
+    plan_ids_allocation_df.loc[investment_mask, "plan_id"] = np.random.choice(investment_plans["plan_id"], 
+                                                                           p = investment_plans["plan_weight"] / investment_plans["plan_weight"].sum(),
+                                                                           size = investment_mask.sum())
+
+    return plan_ids_allocation_df
+
+
+def investment_creation_events(conn, context, start_position, end_position, user_ids,uids,  event_times, plan_selection_time, investment_type, device_types, dtypes, is_money_movement_activities, transaction_ids, last_transaction_id, 
+                               transaction_type_ids, event_type_ids, plan_ids, transaction_amounts, amount_invested):
+
+
+    plan_ids_allocation_df = plan_ids_allocation(conn, context,uids, investment_type, plan_selection_time )
+    user_ids[start_position:end_position] = plan_ids_allocation_df["user_id"]
+    event_times[start_position:end_position] = [plan_ids_allocation_df["plan_selection_time"] + pd.to_timedelta(np.random.ranint(3,6),units="M")]
+    plan_creation_time = event_times[start_position:end_position]
+    device_types[start_position:end_position] = dtypes
+    is_money_movement_activities[start_position:end_position] = True
+    transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id + 1 + len(uids))
+    transaction_type_ids[start_position:end_position] = plan_ids_allocation_df["transaction_type_id"]
+    event_type_ids[start_position:end_position] = plan_ids_allocation_df["event_type_id"]
+    plan_ids[start_position:end_position] = plan_ids_allocation_df["plan_id"]
+
+    plan_attributes_df = get_plan_attributes(conn, plan_ids_allocation_df["user_id"], plan_ids_allocation_df["plan_id"],plan_creation_time)
+
+
+def get_customer_behaviour_segment(conn, uids):
+
+    user_ids_df = pd.DataFrame({
+        'user_id':uids
+    })
+
+    conn.register('user_ids_df', user_ids_df)
+
+    try:
+        cbs_df = conn.execute(''' SELECT f.user_id, customer_behaviour_segment from dim_user u inner join user_ids_df f on u.user_id = f.user_id ''').df()
+
+    finally:
+        conn.unregister('user_ids_df')
+
+    return cbs_df
+
+def get_plan_attributes(conn, uids, plan_ids, plan_creation_time):
+
+    plan_ids_df = pd.DataFrame({
+        'user_id':uids,
+        'plan_id':plan_ids,
+        'investment_start_date':plan_creation_time
+    })
+
+    conn.register('plan_ids_df',plan_ids_df)
+
+    try:
+        plan_attributes_df = conn.execute(''' SELECT f.user_id, d.customer_behaviour_segment, f.plan_id, p.tenure_days, f.investment_start_date, 
+                case when p.tenure_days is null then null
+                else f.investment_start_date + (p.tenure_days * INTERVAL '1 DAY')
+                end as investment_maturity_date
+                from dim_plan p inner join plan_ids_df f on p.plan_id = f.plan_id
+                inner join dim_user d on d.user_id = f.user_id ''').df()
+
+        plan_attributes_df["amount_invested"] = plan_attributes_df["customer_behaviour_segment"].apply(lambda segment: int(
+        np.random.triangular(
+            CUSTOMER_BEHAVIOUR_SEGMENT_MAP[segment]["average_investment_amount"][0],
+            np.mean(CUSTOMER_BEHAVIOUR_SEGMENT_MAP[segment]["average_investment_amount"]),
+            CUSTOMER_BEHAVIOUR_SEGMENT_MAP[segment]["average_investment_amount"][1],
+        )
+    )
+)
+    finally:
+        conn.unregister('plan_ids_df')
+
+    return plan_attributes_df
+
+
+
+
+
+
+        
 
 
 

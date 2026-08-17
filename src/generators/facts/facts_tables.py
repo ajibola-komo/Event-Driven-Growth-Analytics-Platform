@@ -9,7 +9,7 @@ from src.config.constants import (DEFAULT_TRANSACTION_START_DATE, DEFAULT_TRANSA
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from src.logic.helper_functions import (update_last_login_timestamp, signup_completion_events, app_login_events, get_last_login, kyc_completion_events,
-                                        wallet_activation_events, get_current_wallet_balance, review_plan_options_events, plan_selection_events)
+                                        wallet_activation_events, get_current_wallet_balance, review_plan_options_events, plan_selection_events, plan_ids_allocation)
 from src.logic.EventContext import (load_event_context)
 
 
@@ -295,15 +295,24 @@ def generate_facts(conn, num_of_events):
     dtypes = np.array([device_type_map.get(uid) for uid in customer_subset_2["user_id"]])
     
 
-    plan_selection_time_df = plan_selection_events(conn, context, start_position, end_position, 
+    plan_selected_df = plan_selection_events(conn, context, start_position, end_position, 
                                                    user_ids, uids, event_time, plan_review_time, event_type_ids, device_types, dtypes)
 
-    
+    plan_selected_df = plan_selected_df.merge(customer_subset_2["customer_behaviour_segment"], how="inner", on="user_id")
+    plan_selected_df = plan_selected_df.merge(customer_subset_2["first_investment_type"], how="inner", on="user_id")
+
+    total_plan_selection_events = len(plan_selected_df)
 
     start_position = end_position
-    end_position = start_position + total_customer_subset_2
+    end_position = start_position + total_plan_selection_events
 
-    user_ids[start_position:end_position] = customer_subset_2["user_id"]
+    uids = plan_selected_df["user_id"]
+    first_inv_type = plan_selected_df["first_investment_type"]
+    plan_selection_time = plan_selected_df["plan_selection_time"]
+
+    plan_ids_allocation_df = plan_ids_allocation(conn, context, uids, first_inv_type, plan_selection_time)
+
+    user_ids[start_position:end_position] = uids
     event_time[start_position:end_position] = [last_review + timedelta(minutes=np.random.randint(3,5)) for last_review in last_plan_selected_time]
     device_types[start_position:end_position] = np.array([device_type_map.get(uid) for uid in customer_subset_2["user_id"]])
 
@@ -314,8 +323,6 @@ def generate_facts(conn, num_of_events):
     for inv in customer_subset_2["first_investment_type"]
     ]
 
-    print("Absent invesment type selections",pd.isna(investment_type_event_type).sum())
-    
     event_type_ids[start_position:end_position] = [event_type_map.get(inv) for inv in investment_type_event_type]
     is_money_movement_activities[start_position:end_position] = True
     transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id +  len(customer_subset_2) + 1)
@@ -353,21 +360,11 @@ def generate_facts(conn, num_of_events):
 
     transaction_statuses[start_position:end_position] = ["success" for _ in range(len(customer_subset_2))]
     transaction_amounts[start_position:end_position] = (customer_subset_2["current_wallet_balance"].values * investment_pct)
-    updated_balance = customer_subset_2["current_wallet_balance"].values - transaction_amounts[start_position:end_position]
-
+    
     last_transaction_id = transaction_ids[start_position:end_position].max()
 
-    balance_map = dict(
-        zip(
-            customer_subset_2["user_id"].values,
-            updated_balance
-        )
-    )
-
-    mask = wallet_activated_users_df["user_id"].isin(balance_map)
-
-    wallet_activated_users_df.loc[mask,"current_wallet_balance"] = wallet_activated_users_df.loc[mask,"user_id"].map(balance_map)
-
+    
+    
     customers_who_have_invested_df = pd.DataFrame({
         "user_id": user_ids[start_position:end_position],
         "last_login_time":event_time[start_position:end_position],
