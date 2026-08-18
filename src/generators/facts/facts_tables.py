@@ -295,11 +295,12 @@ def generate_facts(conn, num_of_events):
     dtypes = np.array([device_type_map.get(uid) for uid in customer_subset_2["user_id"]])
     
 
-    plan_selected_df = plan_selection_events(conn, context, start_position, end_position, 
+    plan_selected_df = plan_selection_events(context, start_position, end_position, 
                                                    user_ids, uids, event_time, plan_review_time, event_type_ids, device_types, dtypes)
 
-    plan_selected_df = plan_selected_df.merge(customer_subset_2["customer_behaviour_segment"], how="inner", on="user_id")
     plan_selected_df = plan_selected_df.merge(customer_subset_2["first_investment_type"], how="inner", on="user_id")
+
+    # investment creation events
 
     total_plan_selection_events = len(plan_selected_df)
 
@@ -310,11 +311,7 @@ def generate_facts(conn, num_of_events):
     first_inv_type = plan_selected_df["first_investment_type"]
     plan_selection_time = plan_selected_df["plan_selection_time"]
 
-    plan_ids_allocation_df = plan_ids_allocation(conn, context, uids, first_inv_type, plan_selection_time)
-
-    user_ids[start_position:end_position] = uids
-    event_time[start_position:end_position] = [last_review + timedelta(minutes=np.random.randint(3,5)) for last_review in last_plan_selected_time]
-    device_types[start_position:end_position] = np.array([device_type_map.get(uid) for uid in customer_subset_2["user_id"]])
+    
 
     investment_type_event_type = [
     "savings_plan_created"

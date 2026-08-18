@@ -2,10 +2,17 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta
 from src.config.constants import (CUSTOMER_BEHAVIOUR_SEGMENT_MAP)
+from duckdb import DuckDBPyConnection
 
 
 
-def update_last_login_timestamp(conn, user_ids, last_login):
+def update_last_login_timestamp(conn: DuckDBPyConnection,
+                                user_ids: list[int],
+                                last_login: list[pd.Timestamp]) -> None:
+
+
+    if len(user_ids) != len(last_login):
+        raise ValueError("user_ids and last_login must have the same length.")
 
     logins_df = pd.DataFrame({
         'user_id':user_ids,
@@ -21,7 +28,7 @@ def update_last_login_timestamp(conn, user_ids, last_login):
     conn.unregister('logins_df')
 
 
-def signup_completion_events(context, start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids ):
+def signup_completion_events(context: any, start_position: int, end_position: int, user_ids: list, uids: list[int], event_times: list, event_time: list[pd.Timestamp], device_types: list, dtypes: list[str], event_type_ids: list) -> None: 
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position]= event_time
     device_types[start_position:end_position] = dtypes
@@ -29,7 +36,7 @@ def signup_completion_events(context, start_position, end_position, user_ids, ui
     event_type_ids[start_position:end_position] = context.signup_completed_event_type_id
 
 
-def app_login_events(conn,context, start_position, end_position, user_ids, uids, event_times,event_time,device_types,dtypes,event_type_ids):
+def app_login_events(conn: DuckDBPyConnection, context: any, start_position: int, end_position: int, user_ids: list, uids: list[int], event_times: list, event_time: list[pd.Timestamp], device_types: list, dtypes: list[str], event_type_ids: list) -> None:
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position]= event_time
     device_types[start_position:end_position] = dtypes
@@ -39,7 +46,7 @@ def app_login_events(conn,context, start_position, end_position, user_ids, uids,
     update_last_login_timestamp(conn, uids,event_time)
 
 
-def get_last_login(conn, uids):
+def get_last_login(conn: DuckDBPyConnection, uids: list[int]) -> pd.DataFrame:
 
     uids_df = pd.DataFrame({"user_id": uids})
 
@@ -222,9 +229,15 @@ def investment_creation_events(conn, context, start_position, end_position, user
 
 
     plan_ids_allocation_df = plan_ids_allocation(conn, context,uids, investment_type, plan_selection_time )
+    plan_ids_allocation_df["plan_creation_time"] = [plan_ids_allocation_df["plan_selection_time"] + pd.to_timedelta(np.random.ranint(3,6),units="M")]
+    plan_attributes_df = get_plan_attributes(conn, plan_ids_allocation_df["user_id"], plan_ids_allocation_df["plan_id"],plan_ids_allocation_df["plan_creation_time"])
+
+    plan_ids_allocation_df = plan_ids_allocation_df.merge(plan_attributes_df, how="inner", on=["user_id","plan_id"])
+
+
+
     user_ids[start_position:end_position] = plan_ids_allocation_df["user_id"]
     event_times[start_position:end_position] = [plan_ids_allocation_df["plan_selection_time"] + pd.to_timedelta(np.random.ranint(3,6),units="M")]
-    plan_creation_time = event_times[start_position:end_position]
     device_types[start_position:end_position] = dtypes
     is_money_movement_activities[start_position:end_position] = True
     transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id + 1 + len(uids))
@@ -232,7 +245,7 @@ def investment_creation_events(conn, context, start_position, end_position, user
     event_type_ids[start_position:end_position] = plan_ids_allocation_df["event_type_id"]
     plan_ids[start_position:end_position] = plan_ids_allocation_df["plan_id"]
 
-    plan_attributes_df = get_plan_attributes(conn, plan_ids_allocation_df["user_id"], plan_ids_allocation_df["plan_id"],plan_creation_time)
+    
 
 
 def get_customer_behaviour_segment(conn, uids):
