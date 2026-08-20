@@ -48,6 +48,12 @@ def app_login_events(conn: DuckDBPyConnection, context: any, start_position: int
 
 def get_last_login(conn: DuckDBPyConnection, uids: list[int]) -> pd.DataFrame:
 
+    """
+        Returns the login_info dataframe with the following attributes:
+            - user_id
+            - last_login_at
+    """
+
     uids_df = pd.DataFrame({"user_id": uids})
 
     conn.register('uids_df',uids_df)
@@ -63,8 +69,9 @@ def get_last_login(conn: DuckDBPyConnection, uids: list[int]) -> pd.DataFrame:
 
     return login_info
 
-def kyc_completion_events(conn,context,start_position, end_position, user_ids, uids, 
-                          event_times,event_time,device_types,dtypes,event_type_ids):
+def kyc_completion_events(conn: DuckDBPyConnection,context:any,start_position:int, end_position:int, user_ids:list[int], uids:list[int], 
+                          event_times:list[pd.Timestamp],event_time:list[pd.Timestamp],device_types:list[str],dtypes:list[str],
+                          event_type_ids:list[int]) -> None:
 
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position]= event_time
