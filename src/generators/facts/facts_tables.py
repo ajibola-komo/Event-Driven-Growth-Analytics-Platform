@@ -9,7 +9,7 @@ from src.config.constants import (DEFAULT_TRANSACTION_START_DATE, DEFAULT_TRANSA
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from src.logic.helper_functions import (update_last_login_timestamp, signup_completion_events, app_login_events, get_last_login, kyc_completion_events,
-                                        wallet_activation_events, get_current_wallet_balance, review_plan_options_events, plan_selection_events, plan_ids_allocation)
+                                        wallet_activation_events, get_current_wallet_balance, review_plan_options_events, plan_selection_events, plan_ids_allocation, build_investment_users_dataframe)
 from src.logic.EventContext import (load_event_context)
 
 
@@ -159,60 +159,33 @@ def generate_facts(conn, num_of_events):
     #wallet activation
     wallet_activated_users = kyc_completed_users[~pd.isna(kyc_completed_users["wallet_activation_timeframe"])].copy()
 
-    segment_customers = dict(zip(users_data["user_id"],users_data["customer_behaviour_segment"]))
-
-    wallet_activated_users["customer_behaviour_segment"] = wallet_activated_users["user_id"].map(segment_customers)
-
-    wallet_activated_users["amount_invested"] = np.array([
-        np.random.randint(CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["average_investment_amount"][0] // AMOUNT_INCREMENT,
-            CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["average_investment_amount"][1] // AMOUNT_INCREMENT + 1
-            
-        ) * AMOUNT_INCREMENT
-        for bh in wallet_activated_users["customer_behaviour_segment"]
-    ])
-
     total_wallet_activated_users = len(wallet_activated_users)
 
     start_position = end_position
     end_position = start_position + total_wallet_activated_users
 
+    uids = wallet_activated_users["user_id"]
     etime = [signup_map.get(uid,None) + timedelta(minutes=int(ro)) for uid, ro in zip(wallet_activated_users["user_id"], wallet_activated_users["wallet_activation_timeframe"])]
     dtypes = np.array([device_type_map.get(uid) for uid in wallet_activated_users["user_id"]])
     wids = [wallet_id_map.get(uid) for uid in wallet_activated_users["user_id"]]
     
     last_transaction_id = wallet_activation_events(
-        conn, context, start_position, end_position,user_ids, wallet_activated_users["user_id"], event_time, etime,
+        conn, context, start_position, end_position,user_ids, uids, event_time, etime,
     device_types, dtypes, event_type_ids, wallet_ids, wids, is_money_movement_activities, transaction_type_ids, transaction_ids, transaction_amounts,
     wallet_activated_users["amount_invested"],transaction_statuses, last_transaction_id
     )
     
 
     #let's create the initial investment -- login, review_plan_options then drop off for some users, and for others, they will make an investment after reviewing the plan options. We will create a new dataframe to hold the users who made an investment and their corresponding investment details.
-    
-    uids = wallet_activated_users["user_id"]
-
-    current_balances = get_current_wallet_balance(conn, uids)
-
-    last_login = get_last_login(conn, uids)
-
-
-    wallet_activated_users_df = pd.DataFrame({
-        "user_id": uids,
-        "customer_behaviour_segment": uids.map(segment_customers),
-        })
-
-    #current balance and last_login_at
-    wallet_activated_users_df = wallet_activated_users_df.merge(current_balances,on = "user_id", how="inner")
-    wallet_activated_users_df = wallet_activated_users_df.merge(last_login, on = "user_id",how="inner")
 
     #these users will just login and review plan options, but will not make an investment. We will create a new dataframe to hold the users who made an investment and their corresponding investment details.
 
     
-    customer_subset_1 = wallet_activated_users_df.sample(frac = 0.55, random_state=1)
+    customer_subset_1 = wallet_activated_users.sample(frac = 0.55, random_state=1)
+    customer_subset_1["last_login_at"] = get_last_login(conn, customer_subset_1["user_id"])
 
     total_customer_subset_1 = len(customer_subset_1)
 
-    
     start_position = end_position
     end_position = start_position + total_customer_subset_1
 
@@ -231,35 +204,10 @@ def generate_facts(conn, num_of_events):
 
     review_plan_options_events(conn,context,start_position, end_position, user_ids, uids, event_time, event_type_ids, device_types, dtypes)
 
-    customer_behaviour_segment_wallet_activated_users = wallet_activated_users_df['customer_behaviour_segment']
+    # These are the users who will make an investment
 
-    probability_of_making_first_investment = [
-    np.random.choice(USERS_MAKES_FIRST_INVESTMENT_AFTER_FUNDING,p=CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp]['wallet_to_investment_conversion_probability'])
-    for cp in customer_behaviour_segment_wallet_activated_users
-]
-
-    mins_to_first_investment = [
-    np.random.randint(
-        CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp]['mins_to_first_investment'][0],
-        CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp]['mins_to_first_investment'][1] + 1
-    )
-    for cp in customer_behaviour_segment_wallet_activated_users
-]
-
-    first_investment_type = [np.random.choice(
-        FIRST_INVESTMENT_TYPE,
-        p= CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp][
-            'first_investment_type_probability'
-        ]
-    )
-    for cp in customer_behaviour_segment_wallet_activated_users]
-
-    wallet_activated_users_df['makes_first_investment'] = probability_of_making_first_investment
-
-    wallet_activated_users_df['mins_to_first_investment'] = mins_to_first_investment
-
-    wallet_activated_users_df['first_investment_type'] = first_investment_type
-
+    wallet_activated_users_df = build_investment_users_dataframe(conn, wallet_activated_users)
+    
     customer_subset_2 = wallet_activated_users_df[wallet_activated_users_df['makes_first_investment'] == True]
 
     customer_subset_2 = customer_subset_2.copy().reset_index(drop=True)

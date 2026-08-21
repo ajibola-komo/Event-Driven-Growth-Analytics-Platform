@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from datetime import timedelta
-from src.config.constants import (CUSTOMER_BEHAVIOUR_SEGMENT_MAP)
+from src.config.constants import (CUSTOMER_BEHAVIOUR_SEGMENT_MAP, USERS_MAKES_FIRST_INVESTMENT_AFTER_FUNDING, FIRST_INVESTMENT_TYPE)
 from duckdb import DuckDBPyConnection
 
 
@@ -92,12 +92,20 @@ def kyc_completion_events(conn: DuckDBPyConnection,context:any,start_position:in
     conn.unregister('kyc_activation_df')
 
 
-def wallet_activation_events(conn, context, start_position, end_position, 
-                             user_ids, uids, event_times, event_time, device_types,dtypes,
-                             event_type_ids, wallet_ids, wids, is_money_movement_activity,
-                            transaction_type_ids, transaction_ids, transaction_amounts,tran_amount, 
-                            transaction_statuses, last_transaction_id):
+def wallet_activation_events(conn: DuckDBPyConnection, context: any, start_position:int, end_position:int, 
+                             user_ids:list[int], uids:list[int], event_times:list[pd.Timestamp], event_time:list[pd.Timestamp], device_types:list[str],dtypes:list[str],
+                             event_type_ids:list[int], wallet_ids:list[int], wids:list[int], is_money_movement_activity:list[bool],
+                            transaction_type_ids:list[int], transaction_ids:list[int], transaction_amounts:list[float], 
+                            transaction_statuses:list[str], last_transaction_id:int) -> int:
 
+    """
+        Returns the last_transaction_id after updating the wallet balance for the given users.
+    
+    """
+
+    #first we need to get the customer behaviour segment to generate the transaction amount for each user
+
+    tran_amount = generate_wallet_funding_amounts(conn, uids)
     
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position] = event_time
@@ -255,7 +263,13 @@ def investment_creation_events(conn, context, start_position, end_position, user
     
 
 
-def get_customer_behaviour_segment(conn, uids):
+def get_customer_behaviour_segment(conn: DuckDBPyConnection, uids: list[int]) -> pd.DataFrame:
+
+    """
+    Returns a dataframe with the following attributes:
+        - user_id
+        - customer_behaviour_segment
+    """
 
     user_ids_df = pd.DataFrame({
         'user_id':uids
@@ -303,8 +317,59 @@ def get_plan_attributes(conn, uids, plan_ids, plan_creation_time):
     return plan_attributes_df
 
 
+def generate_wallet_funding_amounts(conn: DuckDBPyConnection, uids:list[int]) -> list[float]:
 
+    """
+        Returns a list of transaction amounts generated based on the user's behaviour segment
+    """
 
+    cbs_df = get_customer_behaviour_segment(conn, uids)
+
+    cbs_map = dict(zip(cbs_df["user_id"], cbs_df["customer_behaviour_segment"]))
+
+    tran_amount = [int(np.random.triangular(
+        CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cbs_map[uid]]["average_wallet_funding_amount"][0],
+        np.mean(CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cbs_map[uid]]["average_wallet_funding_amount"]),
+        CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cbs_map[uid]]["average_wallet_funding_amount"][1],
+    )) for uid in uids]
+
+    return tran_amount
+
+def build_investment_users_dataframe(conn:DuckDBPyConnection, wallet_activated_users_dataframe:pd.DataFrame) -> pd.DataFrame:
+
+    cbf = get_customer_behaviour_segment(conn, wallet_activated_users_dataframe["user_id"])
+
+    wallet_activated_users_dataframe["customer_behaviour_segment"] = cbf["customer_behaviour_segment"]
+
+    probability_of_making_first_investment = [
+        np.random.choice(USERS_MAKES_FIRST_INVESTMENT_AFTER_FUNDING,p=CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp]['wallet_to_investment_conversion_probability'])
+        for cp in wallet_activated_users_dataframe["customer_behaviour_segment"]
+    ]
+    
+    mins_to_first_investment = [
+        np.random.randint(
+            CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp]['mins_to_first_investment'][0],
+            CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp]['mins_to_first_investment'][1] + 1
+        )
+        for cp in wallet_activated_users_dataframe["customer_behaviour_segment"]
+    ]
+    
+    first_investment_type = [np.random.choice(
+            FIRST_INVESTMENT_TYPE,
+            p= CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp][
+                'first_investment_type_probability'
+            ]
+        )
+        for cp in wallet_activated_users_dataframe["customer_behaviour_segment"]]
+    
+    wallet_activated_users_dataframe['makes_first_investment'] = probability_of_making_first_investment
+    
+    wallet_activated_users_dataframe['mins_to_first_investment'] = mins_to_first_investment
+    
+    wallet_activated_users_dataframe['first_investment_type'] = first_investment_type
+
+    return wallet_activated_users_dataframe
+    
 
 
         
