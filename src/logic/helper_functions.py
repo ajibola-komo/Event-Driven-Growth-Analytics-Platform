@@ -341,6 +341,8 @@ def build_investment_users_dataframe(conn:DuckDBPyConnection, wallet_activated_u
 
     wallet_activated_users_dataframe["customer_behaviour_segment"] = cbf["customer_behaviour_segment"]
 
+    wallet_activated_users_dataframe["last_login_at"] = get_last_login(conn,wallet_activated_users_dataframe["user_id"] )
+
     probability_of_making_first_investment = [
         np.random.choice(USERS_MAKES_FIRST_INVESTMENT_AFTER_FUNDING,p=CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp]['wallet_to_investment_conversion_probability'])
         for cp in wallet_activated_users_dataframe["customer_behaviour_segment"]
