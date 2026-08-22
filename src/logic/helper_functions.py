@@ -179,7 +179,14 @@ def review_plan_options_events(conn, context, start_position, end_position, user
     device_types[start_position:end_position] = dtypes
     event_type_ids[start_position:end_position] = context.review_plan_options_event_type_id
 
-def plan_selection_events(context, start_position, end_position, user_ids, uids, event_time, plan_review_time, event_type_ids, device_types, dtypes):
+def plan_selection_events(context:any, start_position:int, end_position:int, user_ids:list[int], uids:list[int], event_time:list[pd.Timestamp], plan_review_time:list[pd.Timestamp], event_type_ids:list[int], device_types:list[int], dtypes:list[int]) -> pd.DataFrame:
+
+
+    """
+        This function generates the plan selection events and returns a dataframe with the following attributes:
+            - user_id
+            - plan_selection_time   
+        """
 
     random_offset = np.random.randint(1,3,size=len(uids))
     plan_selection_time = [review_time + timedelta(minutes=ro) for review_time, ro in zip(plan_review_time, random_offset)]
