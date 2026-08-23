@@ -303,7 +303,7 @@ def get_customer_behaviour_segment(conn: DuckDBPyConnection, uids: list[int]) ->
 
     return cbs_df
 
-def get_plan_attributes(conn, uids, plan_ids, plan_creation_time):
+def get_plan_attributes(conn:DuckDBPyConnection, uids:list[int], plan_ids:list[int], plan_creation_time:list[pd.Timestamp]) -> pd.DataFrame:
 
     plan_ids_df = pd.DataFrame({
         'user_id':uids,
