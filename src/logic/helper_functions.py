@@ -204,7 +204,18 @@ def plan_selection_events(context:any, start_position:int, end_position:int, use
     return plan_selection_df
 
 
-def plan_ids_allocation(conn, context, uids, investment_type, plan_selection_time):
+def plan_ids_allocation(conn:DuckDBPyConnection, context:any, uids:list[int], investment_type:list[str], plan_selection_time:list[pd.Timestamp]) -> pd.DataFrame:
+
+
+    """
+        Returns a dataframe with the following attributes:
+            - user_id
+            - investment_type
+            - plan_id
+            - plan_selection_time
+            - event_type_ids(the event type ids are already pre-allocated)
+            - transaction_type_ids (the transaction type ids are already pre-allocated)
+    """
 
     savings_plans = conn.execute('''select plan_id, plan_weight from dim_plan where plan_category = 'Savings' ''').df()
 
@@ -246,8 +257,10 @@ def plan_ids_allocation(conn, context, uids, investment_type, plan_selection_tim
     return plan_ids_allocation_df
 
 
-def investment_creation_events(conn, context, start_position, end_position, user_ids,uids,  event_times, plan_selection_time, investment_type, device_types, dtypes, is_money_movement_activities, transaction_ids, last_transaction_id, 
-                               transaction_type_ids, event_type_ids, plan_ids, transaction_amounts, amount_invested):
+def investment_creation_events(conn: DuckDBPyConnection, context:any, start_position:int, end_position:int, user_ids:list[int],uids:list[int], event_times:list[pd.Timestamp], 
+                               plan_selection_time:list[pd.Timestamp], investment_type:list[str], device_types:list[str], dtypes:list[str], 
+                               is_money_movement_activities:list[bool], transaction_ids:list[int], last_transaction_id:int, 
+                               transaction_type_ids:list[int], event_type_ids:list[int], plan_ids:list[int], transaction_amounts:list[float], amount_invested:list[float]):
 
 
     plan_ids_allocation_df = plan_ids_allocation(conn, context,uids, investment_type, plan_selection_time )
@@ -266,8 +279,6 @@ def investment_creation_events(conn, context, start_position, end_position, user
     transaction_type_ids[start_position:end_position] = plan_ids_allocation_df["transaction_type_id"]
     event_type_ids[start_position:end_position] = plan_ids_allocation_df["event_type_id"]
     plan_ids[start_position:end_position] = plan_ids_allocation_df["plan_id"]
-
-    
 
 
 def get_customer_behaviour_segment(conn: DuckDBPyConnection, uids: list[int]) -> pd.DataFrame:
@@ -328,6 +339,7 @@ def generate_wallet_funding_amounts(conn: DuckDBPyConnection, uids:list[int]) ->
 
     """
         Returns a list of transaction amounts generated based on the user's behaviour segment
+        
     """
 
     cbs_df = get_customer_behaviour_segment(conn, uids)
