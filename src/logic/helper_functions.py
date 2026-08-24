@@ -309,6 +309,9 @@ def investment_creation_events(conn: DuckDBPyConnection, context:any, start_posi
     transaction_amounts[start_position:end_position] = plan_ids_allocation_df['amount_invested']
     amount_invested[start_position:end_position] = plan_ids_allocation_df['amount_invested']
 
+    deduct_wallet_balance(conn, plan_ids_allocation_df["user_id"], plan_ids_allocation_df['amount_invested'], transaction_ids[start_position:end_position], plan_ids_allocation_df["plan_creation_time"])
+
+    
     
 
 
