@@ -155,6 +155,24 @@ def update_wallet_balance(conn:DuckDBPyConnection, uids:list[int], transaction_a
     
     conn.unregister('wallet_activation_df')
 
+def deduct_wallet_balance(conn:DuckDBPyConnection, uids:list[int], transaction_amount:list[float], transaction_ids:list[int], event_time:list[pd.Timestamp]) -> None:
+
+    transactions_data_df = pd.DataFrame({
+        'user_id':uids,
+        'transaction_amount':transaction_amount,
+        'transaction_id':transaction_ids,
+        'last_updated_at':event_time
+    })
+
+    conn.register('transactions_df',transactions_data_df)
+
+    conn.execute('''
+            UPDATE fact_wallet_balance AS f SET current_balance = f.current_balance - t.transaction_amount, last_updated_at = t.last_updated_at, 
+            updated_at = t.last_updated_at, last_updated_at_id = CAST(strftime(t.last_updated_at, '%Y%m%d') AS BIGINT),
+                                    last_transaction_id = w.last_transaction_id FROM transactions_df AS t WHERE f.user_id = t.user_id''')
+
+    conn.unregister('transactions_df')
+
 def get_current_wallet_balance(conn:DuckDBPyConnection, uids:list[int]) -> pd.DataFrame:
 
     """
@@ -268,7 +286,7 @@ def plan_ids_allocation(conn:DuckDBPyConnection, context:any, uids:list[int], in
 def investment_creation_events(conn: DuckDBPyConnection, context:any, start_position:int, end_position:int, user_ids:list[int],uids:list[int], event_times:list[pd.Timestamp], 
                                plan_selection_time:list[pd.Timestamp], investment_type:list[str], device_types:list[str], dtypes:list[str], 
                                is_money_movement_activities:list[bool], transaction_ids:list[int], last_transaction_id:int, 
-                               transaction_type_ids:list[int], event_type_ids:list[int], plan_ids:list[int], transaction_amounts:list[float], amount_invested:list[float]):
+                               transaction_type_ids:list[int], event_type_ids:list[int], plan_ids:list[int], transaction_amounts:list[float], amount_invested:list[float]) -> pd.DataFrame:
 
 
     plan_ids_allocation_df = plan_ids_allocation(conn, context,uids, investment_type, plan_selection_time )
@@ -276,17 +294,22 @@ def investment_creation_events(conn: DuckDBPyConnection, context:any, start_posi
     plan_attributes_df = get_plan_attributes(conn, plan_ids_allocation_df["user_id"], plan_ids_allocation_df["plan_id"],plan_ids_allocation_df["plan_creation_time"])
 
     plan_ids_allocation_df = plan_ids_allocation_df.merge(plan_attributes_df, how="inner", on=["user_id","plan_id"])
-
+    investment_amount_df = create_investment_amount(conn,uids)
+    plan_ids_allocation_df = plan_ids_allocation_df.merge(investment_amount_df,how="inner",on="user_id")
 
 
     user_ids[start_position:end_position] = plan_ids_allocation_df["user_id"]
-    event_times[start_position:end_position] = [plan_ids_allocation_df["plan_selection_time"] + pd.to_timedelta(np.random.ranint(3,6),units="M")]
+    event_times[start_position:end_position] = plan_ids_allocation_df["plan_creation_time"]
     device_types[start_position:end_position] = dtypes
     is_money_movement_activities[start_position:end_position] = True
     transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id + 1 + len(uids))
     transaction_type_ids[start_position:end_position] = plan_ids_allocation_df["transaction_type_id"]
     event_type_ids[start_position:end_position] = plan_ids_allocation_df["event_type_id"]
     plan_ids[start_position:end_position] = plan_ids_allocation_df["plan_id"]
+    transaction_amounts[start_position:end_position] = plan_ids_allocation_df['amount_invested']
+    amount_invested[start_position:end_position] = plan_ids_allocation_df['amount_invested']
+
+    
 
 
 def get_customer_behaviour_segment(conn: DuckDBPyConnection, uids: list[int]) -> pd.DataFrame:
@@ -397,16 +420,24 @@ def create_investment_amount(conn:DuckDBPyConnection, uids:list[int]) -> pd.Data
     """
         Returns a dataframe with the following attributes:
             - user_id
-            - current_balance
-            - investment_percentage
             - amount_invested
     """
 
+    cbs_df = get_customer_behaviour_segment(conn,uids)
+
+    cbs_df['investment_percentage'] = cbs_df['customer_behaviour_segment'].apply(
+    lambda segment: np.random.uniform(
+        *CUSTOMER_BEHAVIOUR_SEGMENT_MAP[segment]['investment_percentage']
+    )
+)
+
     investments_df = get_current_wallet_balance(conn,uids)
 
-    investments_df['investment_percentage'] = np.random.uniform(0.5,0.95,len(investments_df))
+    investments_df = investments_df.merge(cbs_df, how="inner", on="user_id")
 
-    investments_df['amount_invested'] = investments_df['current_balance'] * investments_df['investment_percentage']
+    investments_df['amount_invested'] = (investments_df['current_balance'] * investments_df['investment_percentage']).round(2)
+
+    investments_df = investments_df.drop(columns=['customer_behaviour_segment','investment_percentage','current_balance'])
 
     return investments_df
 

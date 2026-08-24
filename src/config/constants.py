@@ -99,7 +99,7 @@ CUSTOMER_PERSONA_MAP = {
         'wallet_activation_weight':[0.25,0.75], #25% activate wallet immediately, 75% delay activation
         'mins_to_first_funding':[25920,36000] ,#between 18 and 25 days
         'acquisition_channels_weights': [0.15,0.4,0.2,0.05,0.1,0.1], #higher weight on paid social and referral program
-        'customer_behavioural_segment':[0.02,0.55, 0.03, 0.2,0, 0.2],
+        'customer_behavioural_segment':[0.02,0.55, 0.03, 0.2,0, 0.2]
     },
     'Goal-Oriented Saver':{
         'age_range':[25,56],
@@ -181,7 +181,8 @@ CUSTOMER_BEHAVIOUR_SEGMENT_MAP = {
         'mins_to_first_investment':[1440,14400], #between 1 and 10 days after wallet funding
         'first_investment_type_probability':[0.7,0.3], #70% chance their first investment is a savings product, 30% chance it's an investment product
         'device_type':[0.65,0.35],
-        'investment_type_probability':[0.2,0.8]
+        'investment_type_probability':[0.2,0.8],
+        'investment_percentage':[0.7,0.95]
     },
 
     'High_Engagement_Low_Balance':{
@@ -197,7 +198,8 @@ CUSTOMER_BEHAVIOUR_SEGMENT_MAP = {
         'mins_to_first_investment':[4320,14400], #between 3 and 10 days after wallet funding
         'first_investment_type_probability':[0.6,0.4], #60% chance their first investment is a savings product, 40% chance it's an investment product
         'device_type':[0.3,0.7],
-        'investment_type_probability':[0.2,0.8]
+        'investment_type_probability':[0.2,0.8],
+        'investment_percentage':[0.6,0.85]
     },
 
     'Moderate_Engagement_High_Balance':{
@@ -213,7 +215,8 @@ CUSTOMER_BEHAVIOUR_SEGMENT_MAP = {
         'mins_to_first_investment':[10080,30240], #between 7 and 21 days after wallet funding
         'first_investment_type_probability':[0.5,0.5], #50% chance their first investment is a savings product, 50% chance it's an investment product
         'device_type':[0.6,0.4],
-        'investment_type_probability':[0.5,0.5]
+        'investment_type_probability':[0.5,0.5],
+        'investment_percentage':[0.6,0.85]
     },
 
     'Moderate_Engagement_Low_Balance':{
@@ -229,7 +232,8 @@ CUSTOMER_BEHAVIOUR_SEGMENT_MAP = {
         'mins_to_first_investment':[10080,20160], #between 7 and 14 days after wallet funding
         'first_investment_type_probability':[0.6,0.4], #40% chance their first investment is a savings product, 60% chance it's an investment product
         'device_type':[0.25,0.75],
-        'investment_type_probability':[0.5,0.5]
+        'investment_type_probability':[0.5,0.5],
+        'investment_percentage':[0.5,0.75]
     },
 
     'Low_Engagement_High_Balance':{
@@ -245,7 +249,8 @@ CUSTOMER_BEHAVIOUR_SEGMENT_MAP = {
         'mins_to_first_investment':[20160,43200], #between 14 and 30 days after wallet funding
         'first_investment_type_probability':[0.3,0.7], #30% chance their first investment is a savings product, 70% chance it's an investment product
         'device_type':[0.55,0.45],
-        'investment_type_probability':[0.5,0.5]
+        'investment_type_probability':[0.5,0.5],
+        'investment_percentage':[0.7,0.9]
     },
 
     'Low_Engagement_Low_Balance':{
@@ -261,7 +266,8 @@ CUSTOMER_BEHAVIOUR_SEGMENT_MAP = {
         'mins_to_first_investment':[43200,64800], #between 14 and 45 days after wallet funding
         'first_investment_type_probability':[0.8,0.2], #20% chance their first investment is a savings product, 80% chance it's an investment product
         'device_type':[0.2,0.8],
-        'investment_type_probability':[0.5,0.5]
+        'investment_type_probability':[0.5,0.5],
+        'investment_percentage':[0.5,0.7]
     }
 }
 
