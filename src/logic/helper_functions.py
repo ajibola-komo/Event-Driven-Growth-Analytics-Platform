@@ -4,8 +4,6 @@ from datetime import timedelta
 from src.config.constants import (CUSTOMER_BEHAVIOUR_SEGMENT_MAP, USERS_MAKES_FIRST_INVESTMENT_AFTER_FUNDING, FIRST_INVESTMENT_TYPE)
 from duckdb import DuckDBPyConnection
 
-
-
 def update_last_login_timestamp(conn: DuckDBPyConnection,
                                 user_ids: list[int],
                                 last_login: list[pd.Timestamp]) -> None:
@@ -27,14 +25,12 @@ def update_last_login_timestamp(conn: DuckDBPyConnection,
 
     conn.unregister('logins_df')
 
-
 def signup_completion_events(context: any, start_position: int, end_position: int, user_ids: list, uids: list[int], event_times: list, event_time: list[pd.Timestamp], device_types: list, dtypes: list[str], event_type_ids: list) -> None: 
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position]= event_time
     device_types[start_position:end_position] = dtypes
 
     event_type_ids[start_position:end_position] = context.signup_completed_event_type_id
-
 
 def app_login_events(conn: DuckDBPyConnection, context: any, start_position: int, end_position: int, user_ids: list, uids: list[int], event_times: list, event_time: list[pd.Timestamp], device_types: list, dtypes: list[str], event_type_ids: list) -> None:
     user_ids[start_position:end_position] = uids
@@ -44,7 +40,6 @@ def app_login_events(conn: DuckDBPyConnection, context: any, start_position: int
     event_type_ids[start_position:end_position] = context.app_login_event_type_id
 
     update_last_login_timestamp(conn, uids,event_time)
-
 
 def get_last_login(conn: DuckDBPyConnection, uids: list[int]) -> pd.DataFrame:
 
@@ -77,7 +72,6 @@ def kyc_completion_events(conn: DuckDBPyConnection,context:any,start_position:in
     event_times[start_position:end_position]= event_time
     device_types[start_position:end_position] = dtypes
     
-    
     event_type_ids[start_position:end_position] = context.kyc_completed_event_type_id
 
     kyc_activation_df = pd.DataFrame({
@@ -91,7 +85,6 @@ def kyc_completion_events(conn: DuckDBPyConnection,context:any,start_position:in
 
     conn.unregister('kyc_activation_df')
 
-
 def wallet_activation_events(conn: DuckDBPyConnection, context: any, start_position:int, end_position:int, 
                              user_ids:list[int], uids:list[int], event_times:list[pd.Timestamp], event_time:list[pd.Timestamp], device_types:list[str],dtypes:list[str],
                              event_type_ids:list[int], wallet_ids:list[int], wids:list[int], is_money_movement_activity:list[bool],
@@ -99,6 +92,11 @@ def wallet_activation_events(conn: DuckDBPyConnection, context: any, start_posit
                             transaction_statuses:list[str], last_transaction_id:int) -> int:
 
     """
+        This method creates the wallet activation events i.e. a registered user's first funding.
+        This methods calls:
+            1) generate_wallet_funding_amount() function to create the funding amounts based on the user's customer behaviour segment.
+            2) update_wallet_balance() function to update the fact_wallet_balance table with the updated transaction amounts.
+        
         Returns the last_transaction_id after updating the wallet balance for the given users.
     
     """
@@ -135,8 +133,11 @@ def wallet_activation_events(conn: DuckDBPyConnection, context: any, start_posit
 
     return last_transaction_id
 
+def update_wallet_balance(conn:DuckDBPyConnection, uids:list[int], transaction_amount:list[float], transaction_ids:list[int], event_time:list[pd.Timestamp]) -> None:
 
-def update_wallet_balance(conn, uids, transaction_amount, transaction_ids, event_time):
+    """
+        This function updates the fact_wallet_balance table with the updated transaction amounts for the given users.
+    """
 
     wallet_activation_df = pd.DataFrame({
             'user_id':uids,
@@ -154,7 +155,14 @@ def update_wallet_balance(conn, uids, transaction_amount, transaction_ids, event
     
     conn.unregister('wallet_activation_df')
 
-def get_current_wallet_balance(conn, uids):
+def get_current_wallet_balance(conn:DuckDBPyConnection, uids:list[int]) -> pd.DataFrame:
+
+    """
+        This function returns the current wallet balance for the given users.
+        It returns a data frame with the following attributes:
+            - user_id
+            - current_balance    
+    """
 
     uids_df = pd.DataFrame({
         'user_id':uids
@@ -320,15 +328,6 @@ def get_plan_attributes(conn:DuckDBPyConnection, uids:list[int], plan_ids:list[i
                 end as investment_maturity_date
                 from dim_plan p inner join plan_ids_df f on p.plan_id = f.plan_id
                 inner join dim_user d on d.user_id = f.user_id ''').df()
-
-        plan_attributes_df["amount_invested"] = plan_attributes_df["customer_behaviour_segment"].apply(lambda segment: int(
-        np.random.triangular(
-            CUSTOMER_BEHAVIOUR_SEGMENT_MAP[segment]["average_investment_amount"][0],
-            np.mean(CUSTOMER_BEHAVIOUR_SEGMENT_MAP[segment]["average_investment_amount"]),
-            CUSTOMER_BEHAVIOUR_SEGMENT_MAP[segment]["average_investment_amount"][1],
-        )
-    )
-)
     finally:
         conn.unregister('plan_ids_df')
 
@@ -354,7 +353,9 @@ def generate_wallet_funding_amounts(conn: DuckDBPyConnection, uids:list[int]) ->
 
     return tran_amount
 
-def build_investment_users_dataframe(conn:DuckDBPyConnection, wallet_activated_users_dataframe:pd.DataFrame) -> pd.DataFrame:
+def build_investment_creation_users_dataframe(conn:DuckDBPyConnection, wallet_activated_users_dataframe:pd.DataFrame) -> pd.DataFrame:
+
+
 
     cbf = get_customer_behaviour_segment(conn, wallet_activated_users_dataframe["user_id"])
 
@@ -391,6 +392,23 @@ def build_investment_users_dataframe(conn:DuckDBPyConnection, wallet_activated_u
 
     return wallet_activated_users_dataframe
     
+def create_investment_amount(conn:DuckDBPyConnection, uids:list[int]) -> pd.DataFrame:
+
+    """
+        Returns a dataframe with the following attributes:
+            - user_id
+            - current_balance
+            - investment_percentage
+            - amount_invested
+    """
+
+    investments_df = get_current_wallet_balance(conn,uids)
+
+    investments_df['investment_percentage'] = np.random.uniform(0.5,0.95,len(investments_df))
+
+    investments_df['amount_invested'] = investments_df['current_balance'] * investments_df['investment_percentage']
+
+    return investments_df
 
 
         
