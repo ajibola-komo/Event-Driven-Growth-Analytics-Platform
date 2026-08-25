@@ -311,6 +311,9 @@ def investment_creation_events(conn: DuckDBPyConnection, context:any, start_posi
 
     deduct_wallet_balance(conn, plan_ids_allocation_df["user_id"], plan_ids_allocation_df['amount_invested'], transaction_ids[start_position:end_position], plan_ids_allocation_df["plan_creation_time"])
 
+    # build dataframe
+
+
     
     
 
@@ -339,6 +342,18 @@ def get_customer_behaviour_segment(conn: DuckDBPyConnection, uids: list[int]) ->
 
 def get_plan_attributes(conn:DuckDBPyConnection, uids:list[int], plan_ids:list[int], plan_creation_time:list[pd.Timestamp]) -> pd.DataFrame:
 
+    """
+        Returns a dataframe with the following attributes:
+
+        - user_id
+        - wallet_id
+        - customer_behaviour_segment
+        - plan_id
+        - tenure_days
+        - investment_start_date
+        - investment_maturity_date
+    """
+
     plan_ids_df = pd.DataFrame({
         'user_id':uids,
         'plan_id':plan_ids,
@@ -348,12 +363,14 @@ def get_plan_attributes(conn:DuckDBPyConnection, uids:list[int], plan_ids:list[i
     conn.register('plan_ids_df',plan_ids_df)
 
     try:
-        plan_attributes_df = conn.execute(''' SELECT f.user_id, d.customer_behaviour_segment, f.plan_id, p.tenure_days, f.investment_start_date, 
+        plan_attributes_df = conn.execute(''' SELECT f.user_id, w.wallet_id, d.customer_behaviour_segment, f.plan_id, p.tenure_days, f.investment_start_date, 
                 case when p.tenure_days is null then null
                 else f.investment_start_date + (p.tenure_days * INTERVAL '1 DAY')
                 end as investment_maturity_date
-                from dim_plan p inner join plan_ids_df f on p.plan_id = f.plan_id
-                inner join dim_user d on d.user_id = f.user_id ''').df()
+                from dim_plan as p inner join plan_ids_df f on p.plan_id = f.plan_id
+                inner join dim_user as d on d.user_id = f.user_id
+                inner join dim_wallet as w on d.user_id = w.user_id
+                   ''').df()
     finally:
         conn.unregister('plan_ids_df')
 
