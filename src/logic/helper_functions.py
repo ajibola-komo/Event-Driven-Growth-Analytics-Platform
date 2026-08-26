@@ -313,7 +313,12 @@ def investment_creation_events(conn: DuckDBPyConnection, context:any, start_posi
 
     # build dataframe
 
-
+    investment_df = pd.DataFrame({
+        'user_id': plan_ids_allocation_df["user_id"],
+        'wallet_id':plan_ids_allocation_df["wallet_id"],
+        'plan_id':plan_ids_allocation_df["plan_id"],
+        'amount_invested':plan_ids_allocation_df["amount_invested"]
+    })
     
     
 
@@ -363,7 +368,7 @@ def get_plan_attributes(conn:DuckDBPyConnection, uids:list[int], plan_ids:list[i
     conn.register('plan_ids_df',plan_ids_df)
 
     try:
-        plan_attributes_df = conn.execute(''' SELECT f.user_id, w.wallet_id, d.customer_behaviour_segment, f.plan_id, p.tenure_days, f.investment_start_date, 
+        plan_attributes_df = conn.execute(''' SELECT f.user_id, w.wallet_id, d.customer_behaviour_segment, f.plan_id, p.tenure_days, case when p.tenure_days is null then null else p.interest_rate_min end as interest_rate, f.investment_start_date, 
                 case when p.tenure_days is null then null
                 else f.investment_start_date + (p.tenure_days * INTERVAL '1 DAY')
                 end as investment_maturity_date
@@ -448,8 +453,7 @@ def create_investment_amount(conn:DuckDBPyConnection, uids:list[int]) -> pd.Data
     cbs_df['investment_percentage'] = cbs_df['customer_behaviour_segment'].apply(
     lambda segment: np.random.uniform(
         *CUSTOMER_BEHAVIOUR_SEGMENT_MAP[segment]['investment_percentage']
-    )
-)
+    ))
 
     investments_df = get_current_wallet_balance(conn,uids)
 
