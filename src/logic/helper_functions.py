@@ -286,11 +286,11 @@ def plan_ids_allocation(conn:DuckDBPyConnection, context:any, uids:list[int], in
 def investment_creation_events(conn: DuckDBPyConnection, context:any, start_position:int, end_position:int, user_ids:list[int],uids:list[int], event_times:list[pd.Timestamp], 
                                plan_selection_time:list[pd.Timestamp], investment_type:list[str], device_types:list[str], dtypes:list[str], 
                                is_money_movement_activities:list[bool], transaction_ids:list[int], last_transaction_id:int, 
-                               transaction_type_ids:list[int], event_type_ids:list[int], plan_ids:list[int], transaction_amounts:list[float], amount_invested:list[float]) -> pd.DataFrame:
+                               transaction_type_ids:list[int], event_type_ids:list[int], plan_ids:list[int], transaction_amounts:list[float], amount_invested:list[float]) -> dict:
 
 
     plan_ids_allocation_df = plan_ids_allocation(conn, context,uids, investment_type, plan_selection_time )
-    plan_ids_allocation_df["plan_creation_time"] = [plan_ids_allocation_df["plan_selection_time"] + pd.to_timedelta(np.random.ranint(3,6),units="M")]
+    plan_ids_allocation_df["plan_creation_time"] = [plan_ids_allocation_df["plan_selection_time"] + pd.to_timedelta(np.random.randint(3,6),unit="m")]
     plan_attributes_df = get_plan_attributes(conn, plan_ids_allocation_df["user_id"], plan_ids_allocation_df["plan_id"],plan_ids_allocation_df["plan_creation_time"])
 
     plan_ids_allocation_df = plan_ids_allocation_df.merge(plan_attributes_df, how="inner", on=["user_id","plan_id"])
@@ -304,7 +304,7 @@ def investment_creation_events(conn: DuckDBPyConnection, context:any, start_posi
     event_times[start_position:end_position] = plan_ids_allocation_df["plan_creation_time"]
     device_types[start_position:end_position] = dtypes
     is_money_movement_activities[start_position:end_position] = True
-    transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id + 1 + len(uids))
+    transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id + 1 + len(plan_ids_allocation_df))
     transaction_type_ids[start_position:end_position] = plan_ids_allocation_df["transaction_type_id"]
     event_type_ids[start_position:end_position] = plan_ids_allocation_df["event_type_id"]
     plan_ids[start_position:end_position] = plan_ids_allocation_df["plan_id"]
@@ -322,9 +322,9 @@ def investment_creation_events(conn: DuckDBPyConnection, context:any, start_posi
         'amount_invested':plan_ids_allocation_df["amount_invested"],
         'expected_maturity_value':plan_ids_allocation_df['expected_maturity_value'],
         'investment_start_date':plan_ids_allocation_df['investment_start_date'],
-        'investment_start_date_id':int(plan_ids_allocation_df['investment_start_date'].strftime("%Y%m%d")),
+        'investment_start_date_id':(plan_ids_allocation_df['investment_start_date'].dt.strftime("%Y%m%d").astype(int)),
         'investment_maturity_date':plan_ids_allocation_df['investment_maturity_date'],
-        'investment_maturity_date_id':int(plan_ids_allocation_df['investment_maturity_date'].strftime("%Y%m%d"))
+        'investment_maturity_date_id':(plan_ids_allocation_df['investment_maturity_date'].dt.strftime("%Y%m%d").astype(int))
     })
 
     last_transaction_id = transaction_ids[start_position:end_position].max()
