@@ -479,6 +479,12 @@ def create_investment_amount(conn:DuckDBPyConnection, uids:list[int]) -> pd.Data
 
     return investments_df
 
+def create_engagement_events(conn:DuckDBPyConnection, customers_who_have_invested_df:pd.DataFrame):
+
+    """
+        Returns 
+    """
+
 
         
 

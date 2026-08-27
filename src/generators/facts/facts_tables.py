@@ -365,7 +365,7 @@ def generate_facts(conn, num_of_events):
 
 
     # simulate one month after investment creation
-        simulation_start = customer["last_login_time"]
+        simulation_start = customer["last_login_at"]
 
         month_end = TODAY
 
