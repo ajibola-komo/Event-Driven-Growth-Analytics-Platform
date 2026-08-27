@@ -297,6 +297,8 @@ def investment_creation_events(conn: DuckDBPyConnection, context:any, start_posi
     investment_amount_df = create_investment_amount(conn,uids)
     plan_ids_allocation_df = plan_ids_allocation_df.merge(investment_amount_df,how="inner",on="user_id")
 
+    plan_ids_allocation_df['expected_maturity_value'] = plan_ids_allocation_df['amount_invested'] * (1 + (plan_ids_allocation_df['interest_rate'] / 100) * plan_ids_allocation_df['tenure_days']/365)
+
 
     user_ids[start_position:end_position] = plan_ids_allocation_df["user_id"]
     event_times[start_position:end_position] = plan_ids_allocation_df["plan_creation_time"]
@@ -317,8 +319,19 @@ def investment_creation_events(conn: DuckDBPyConnection, context:any, start_posi
         'user_id': plan_ids_allocation_df["user_id"],
         'wallet_id':plan_ids_allocation_df["wallet_id"],
         'plan_id':plan_ids_allocation_df["plan_id"],
-        'amount_invested':plan_ids_allocation_df["amount_invested"]
+        'amount_invested':plan_ids_allocation_df["amount_invested"],
+        'expected_maturity_value':plan_ids_allocation_df['expected_maturity_value'],
+        'investment_start_date':plan_ids_allocation_df['investment_start_date'],
+        'investment_start_date_id':int(plan_ids_allocation_df['investment_start_date'].strftime("%Y%m%d")),
+        'investment_maturity_date':plan_ids_allocation_df['investment_maturity_date'],
+        'investment_maturity_date_id':int(plan_ids_allocation_df['investment_maturity_date'].strftime("%Y%m%d"))
     })
+
+    last_transaction_id = transaction_ids[start_position:end_position].max()
+
+    return {
+        'all_investment_df':investment_df, 'last_transaction_id':last_transaction_id
+    }
     
     
 
@@ -355,6 +368,7 @@ def get_plan_attributes(conn:DuckDBPyConnection, uids:list[int], plan_ids:list[i
         - customer_behaviour_segment
         - plan_id
         - tenure_days
+        - interest_rate
         - investment_start_date
         - investment_maturity_date
     """
@@ -368,10 +382,10 @@ def get_plan_attributes(conn:DuckDBPyConnection, uids:list[int], plan_ids:list[i
     conn.register('plan_ids_df',plan_ids_df)
 
     try:
-        plan_attributes_df = conn.execute(''' SELECT f.user_id, w.wallet_id, d.customer_behaviour_segment, f.plan_id, p.tenure_days, case when p.tenure_days is null then null else p.interest_rate_min end as interest_rate, f.investment_start_date, 
-                case when p.tenure_days is null then null
-                else f.investment_start_date + (p.tenure_days * INTERVAL '1 DAY')
-                end as investment_maturity_date
+        plan_attributes_df = conn.execute(''' SELECT f.user_id, w.wallet_id, d.customer_behaviour_segment, f.plan_id, p.tenure_days, 
+                                              case when p.tenure_days is null then null else p.interest_rate_min end as interest_rate, f.investment_start_date, 
+                                              case when p.tenure_days is null then null else f.investment_start_date + (p.tenure_days * INTERVAL '1 DAY')
+                                              end as investment_maturity_date
                 from dim_plan as p inner join plan_ids_df f on p.plan_id = f.plan_id
                 inner join dim_user as d on d.user_id = f.user_id
                 inner join dim_wallet as w on d.user_id = w.user_id
