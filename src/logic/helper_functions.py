@@ -432,7 +432,7 @@ def build_investment_creation_users_dataframe(conn:DuckDBPyConnection, wallet_ac
     
     mins_to_first_investment = [
         np.random.randint(
-            CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp]['mins_to_first_investment'][0],
+            CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp]['mins_to_first_investment'][0], #after wallet funding
             CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cp]['mins_to_first_investment'][1] + 1
         )
         for cp in wallet_activated_users_dataframe["customer_behaviour_segment"]
