@@ -481,13 +481,19 @@ def create_investment_amount(conn:DuckDBPyConnection, uids:list[int]) -> pd.Data
 
     return investments_df
 
-def create_engagement_events(conn:DuckDBPyConnection, start_position:int, engagement_sample_df:pd.DataFrame):
+def create_engagement_events(conn:DuckDBPyConnection, engagement_sample_df:pd.DataFrame):
 
     """
         Returns 
     """
 
     #logins, review_plan_options, wallet fundings and investment creation
+
+    
+    login_events = []
+    engagement_events = []
+    wallet_funding_events = []
+    investment_events = []
 
     for _, customer in engagement_sample_df.iterrows():
 
@@ -500,12 +506,6 @@ def create_engagement_events(conn:DuckDBPyConnection, start_position:int, engage
 
         monthly_logins = np.random.randint(*CUSTOMER_BEHAVIOUR_SEGMENT_MAP[customer["customer_behaviour_segment"]]["monthly_logins"],size=months)
 
-        days_range = [0,days_in_month]
-        hours_range = [0,24]
-        minutes_range = [0,60]
-        seconds_range = [0,60]
-
-
         cbs = customer["customer_behaviour_segment"]
 
 
@@ -513,15 +513,28 @@ def create_engagement_events(conn:DuckDBPyConnection, start_position:int, engage
 
             current_month_start = (simulation_start + relativedelta(months=idx))
             
-            current_month_end = (current_month_start + relativedelta(months=1))
+            current_month_end = min(current_month_start + relativedelta(months=1),simulation_end)
             
             days_in_month = (current_month_end - current_month_start).days
+
+            if days_in_month <= 0:
+                continue
+
+            days_range = [0,days_in_month]
+            hours_range = [0,24]
+            minutes_range = [0,60]
+            seconds_range = [0,60]
+            
 
             number_of_logins_this_month = monthly_logins[idx]
 
             number_of_reviews_this_month = np.random.randint(
-            max(1, int(monthly_logins[idx] * 0.15)),
-            max(2, int(monthly_logins[idx] * 0.4)) + 1)
+            max(1, int(number_of_logins_this_month * 0.15)),
+            max(2, int(number_of_logins_this_month * 0.4)) + 1)
+
+            number_of_wallet_fundings_this_month = np.random.randint(*CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cbs]['monthly_wallet_fundings'])
+
+            number_of_investments_creations_this_month = np.random.randint(*CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cbs]['monthly_investment_position_creation'])
 
             login_times_this_month = [current_month_start + timedelta(days=np.random.randint(*days_range), hours=np.random.randint(*hours_range), 
                                                                       minutes=np.random.randint(*minutes_range), seconds=np.random.randint(*seconds_range)) for _ in range(number_of_logins_this_month)]
@@ -529,9 +542,58 @@ def create_engagement_events(conn:DuckDBPyConnection, start_position:int, engage
             review_times_this_month = [current_month_start + timedelta(days=np.random.randint(*days_range), hours=np.random.randint(*hours_range), minutes=np.random.randint(*minutes_range),
                                                                        seconds=np.random.randint(*seconds_range)) for _ in range(number_of_reviews_this_month)]
 
-            
+
+
+            for login_time in login_times_this_month:
+
+                login_events.append({
+                    'user_id':customer["user_id"],
+                    'event_time':login_time
+                })
+
+
+            for review_time in review_times_this_month:
+
+                engagement_events.append({
+                    'user_id': customer["user_id"],
+                    'event_time':review_time
+                })
+
+            if number_of_wallet_fundings_this_month <= 0:
+                continue
+            else:
+                for wallet_funding_event in range(number_of_wallet_fundings_this_month):
+                    wallet_funding_time = current_month_start + timedelta(days = np.random.randint(*days_range), hours=np.random.randint(*hours_range),
+                                                                           minutes=np.random.randint(*minutes_range),seconds=np.random.randint(*seconds_range))
+                    wallet_funding_events.append({
+                        'user_id':customer['user_id'],
+                        'event_time':wallet_funding_time
+                    })
             
 
+            if number_of_investments_creations_this_month <= 0:
+                continue
+            for new_investment_creation in range(number_of_investments_creations_this_month):
+                    investment_creation_time = current_month_start + timedelta(days = np.random.randint(*days_range), hours=np.random.randint(*hours_range),
+                                                                           minutes=np.random.randint(*minutes_range),seconds=np.random.randint(*seconds_range))
+                    investment_type = np.random.choice(FIRST_INVESTMENT_TYPE, p = CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cbs]['investment_type_probability'])
+                    investment_events.append({
+                                    'user_id':customer['user_id'],
+                                    'event_time':investment_creation_time,
+                                    'investment_type':investment_type
+                                })
+
+    return {
+        'login_events':login_events,
+        'engagement_events':engagement_events,
+        'wallet_funding_events':wallet_funding_events,
+        'investment_events':investment_events
+    }
+
+                        
+
+            
+            
                 
 
 
