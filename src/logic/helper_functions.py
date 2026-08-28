@@ -562,7 +562,7 @@ def create_engagement_events(conn:DuckDBPyConnection, engagement_sample_df:pd.Da
             if number_of_wallet_fundings_this_month <= 0:
                 continue
             else:
-                for wallet_funding_event in range(number_of_wallet_fundings_this_month):
+                for _ in range(number_of_wallet_fundings_this_month):
                     wallet_funding_time = current_month_start + timedelta(days = np.random.randint(*days_range), hours=np.random.randint(*hours_range),
                                                                            minutes=np.random.randint(*minutes_range),seconds=np.random.randint(*seconds_range))
                     wallet_funding_events.append({
@@ -573,7 +573,7 @@ def create_engagement_events(conn:DuckDBPyConnection, engagement_sample_df:pd.Da
 
             if number_of_investments_creations_this_month <= 0:
                 continue
-            for new_investment_creation in range(number_of_investments_creations_this_month):
+            for _ in range(number_of_investments_creations_this_month):
                     investment_creation_time = current_month_start + timedelta(days = np.random.randint(*days_range), hours=np.random.randint(*hours_range),
                                                                            minutes=np.random.randint(*minutes_range),seconds=np.random.randint(*seconds_range))
                     investment_type = np.random.choice(FIRST_INVESTMENT_TYPE, p = CUSTOMER_BEHAVIOUR_SEGMENT_MAP[cbs]['investment_type_probability'])
