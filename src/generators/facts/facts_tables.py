@@ -385,13 +385,12 @@ def generate_facts(conn, num_of_events):
 
             current_month_end = (current_month_start+ relativedelta(months=1))
 
-            days_in_month = (current_month_end- current_month_start).days
+            days_in_month = (current_month_end - current_month_start).days
 
-            
             monthly_reviews = np.random.randint(
             max(1, int(monthly_logins[idx] * 0.15)),
-            max(2, int(monthly_logins[idx] * 0.4)) + 1
-        )
+            max(2, int(monthly_logins[idx] * 0.4)) + 1)
+
     # Login events
             login_times = sorted([current_month_start + timedelta(days=np.random.randint(0, days_in_month),hours=np.random.randint(0, 24),minutes=np.random.randint(0, 60))
                 for _ in range(monthly_logins[idx])])

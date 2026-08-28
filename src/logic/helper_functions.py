@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
 from datetime import timedelta
-from src.config.constants import (CUSTOMER_BEHAVIOUR_SEGMENT_MAP, USERS_MAKES_FIRST_INVESTMENT_AFTER_FUNDING, FIRST_INVESTMENT_TYPE)
+from src.config.constants import (CUSTOMER_BEHAVIOUR_SEGMENT_MAP, USERS_MAKES_FIRST_INVESTMENT_AFTER_FUNDING, FIRST_INVESTMENT_TYPE, TODAY)
 from duckdb import DuckDBPyConnection
+from dateutil.relativedelta import relativedelta
+from src.logic.EventContext import (load_event_context)
 
 def update_last_login_timestamp(conn: DuckDBPyConnection,
                                 user_ids: list[int],
@@ -479,11 +481,73 @@ def create_investment_amount(conn:DuckDBPyConnection, uids:list[int]) -> pd.Data
 
     return investments_df
 
-def create_engagement_events(conn:DuckDBPyConnection, customers_who_have_invested_df:pd.DataFrame):
+def create_engagement_events(conn:DuckDBPyConnection, start_position:int, engagement_sample_df:pd.DataFrame):
 
     """
         Returns 
     """
+
+    #logins, review_plan_options, wallet fundings and investment creation
+
+    for _, customer in engagement_sample_df.iterrows():
+
+        simulation_start = customer["last_login_at"]
+        simulation_end = TODAY
+
+        delta = relativedelta(simulation_end, simulation_start)
+
+        months = max(1,delta.years * 12 + delta.months)
+
+        monthly_logins = np.random.randint(*CUSTOMER_BEHAVIOUR_SEGMENT_MAP[customer["customer_behaviour_segment"]]["monthly_logins"],size=months)
+
+        days_range = [0,days_in_month]
+        hours_range = [0,24]
+        minutes_range = [0,60]
+        seconds_range = [0,60]
+
+
+        cbs = customer["customer_behaviour_segment"]
+
+
+        for idx in range(months):
+
+            current_month_start = (simulation_start + relativedelta(months=idx))
+            
+            current_month_end = (current_month_start + relativedelta(months=1))
+            
+            days_in_month = (current_month_end - current_month_start).days
+
+            number_of_logins_this_month = monthly_logins[idx]
+
+            number_of_reviews_this_month = np.random.randint(
+            max(1, int(monthly_logins[idx] * 0.15)),
+            max(2, int(monthly_logins[idx] * 0.4)) + 1)
+
+            login_times_this_month = [current_month_start + timedelta(days=np.random.randint(*days_range), hours=np.random.randint(*hours_range), 
+                                                                      minutes=np.random.randint(*minutes_range), seconds=np.random.randint(*seconds_range)) for _ in range(number_of_logins_this_month)]
+
+            review_times_this_month = [current_month_start + timedelta(days=np.random.randint(*days_range), hours=np.random.randint(*hours_range), minutes=np.random.randint(*minutes_range),
+                                                                       seconds=np.random.randint(*seconds_range)) for _ in range(number_of_reviews_this_month)]
+
+            
+            
+
+                
+
+
+
+
+
+        
+
+        
+        
+
+
+
+
+
+
 
 
         
