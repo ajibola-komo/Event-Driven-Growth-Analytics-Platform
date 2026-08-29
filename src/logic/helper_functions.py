@@ -481,10 +481,14 @@ def create_investment_amount(conn:DuckDBPyConnection, uids:list[int]) -> pd.Data
 
     return investments_df
 
-def create_engagement_events(conn:DuckDBPyConnection, engagement_sample_df:pd.DataFrame):
+def create_engagement_events(conn:DuckDBPyConnection, engagement_sample_df:pd.DataFrame) -> dict:
 
     """
-        Returns 
+        Returns a data dictionary with the following events:
+            - login_events - Returns (user_id and event_time)
+            - engagement_events - Returns (user_id and event_time)
+            - wallet_funding_events - Returns (user_id and event_time)
+            - investment_events - Returns (user_id, event_time and investment_type)
     """
 
     #logins, review_plan_options, wallet fundings and investment creation
