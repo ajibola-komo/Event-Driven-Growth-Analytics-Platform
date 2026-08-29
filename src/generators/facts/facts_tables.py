@@ -10,7 +10,7 @@ from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 from src.logic.helper_functions import (update_last_login_timestamp, signup_completion_events, app_login_events, get_last_login, kyc_completion_events,
                                         wallet_activation_events, get_current_wallet_balance, review_plan_options_events, plan_selection_events, plan_ids_allocation, build_investment_creation_users_dataframe,
-                                        investment_creation_events, get_customer_behaviour_segment)
+                                        investment_creation_events, get_customer_behaviour_segment, create_engagement_events, review_current_investment_events)
 from src.logic.EventContext import (load_event_context)
 
 
@@ -274,69 +274,6 @@ def generate_facts(conn, num_of_events):
 
     customers_who_have_invested_df = customers_who_have_invested_df.merge(cbs_df, how = "inner", on="user_id")
 
-    avg_number_of_logins_per_month = np.array([
-    np.random.randint(
-        CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["monthly_logins"][0],
-        CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["monthly_logins"][1] + 1
-    )
-    for bh in customers_who_have_invested_df["customer_behaviour_segment"]
-])
-    
-
-    customers_who_have_invested_df["monthly_logins"] = avg_number_of_logins_per_month
-
-    monthly_portfolio_reviews = np.array([
-    np.random.randint(
-        max(1, int(logins * 0.3)),
-        max(2, int(logins * 0.7))
-    )
-    for logins in avg_number_of_logins_per_month
-])
-
-    customers_who_have_invested_df["monthly_portfolio_reviews"] = monthly_portfolio_reviews
-
-    monthly_wallet_fundings = np.array([
-        np.random.randint(
-           CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["monthly_wallet_fundings"][0],
-        CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["monthly_wallet_fundings"][1] + 1
-    )
-    for bh in customers_who_have_invested_df["customer_behaviour_segment"]
-    ])
-
-    monthly_investment_position_creation = np.array([
-        np.random.randint(
-           CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["monthly_investment_position_creation"][0],
-        CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["monthly_investment_position_creation"][1] + 1
-    )
-    for bh in customers_who_have_invested_df["customer_behaviour_segment"]
-    ])
-
-    monthly_savings_position_creation = np.array([
-        np.random.randint(
-           CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["monthly_savings_position_creation"][0],
-        CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["monthly_savings_position_creation"][1] + 1
-    )
-    for bh in customers_who_have_invested_df["customer_behaviour_segment"]
-    ])
-    
-    customers_who_have_invested_df["monthly_wallet_fundings"] = monthly_wallet_fundings
-
-    customers_who_have_invested_df["monthly_plan_fundings"] = np.maximum(monthly_wallet_fundings - 2, 0)
-
-    customers_who_have_invested_df["monthly_investment_position_creation"] = monthly_investment_position_creation
-
-    customers_who_have_invested_df["monthly_savings_position_creation"] = monthly_savings_position_creation
-
-    customers_who_have_invested_df["investment_low_bound"] = np.array([
-        CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["average_investment_amount"][0]
-        for bh in customers_who_have_invested_df["customer_behaviour_segment"]
-    ])
-
-    customers_who_have_invested_df["investment_high_bound"] = np.array([
-        CUSTOMER_BEHAVIOUR_SEGMENT_MAP[bh]["average_investment_amount"][1]
-        for bh in customers_who_have_invested_df["customer_behaviour_segment"]
-    ])
-
 
     active_users_subset = customers_who_have_invested_df[
     (customers_who_have_invested_df["customer_behaviour_segment"] == "High_Engagement_High_Balance")
@@ -359,146 +296,40 @@ def generate_facts(conn, num_of_events):
 
     low_activity_users_sample = low_activity_users_subset.sample(frac=0.65, random_state = 1)
 
-    engagement_events = []
-
-    for _, customer in active_users_sample.iterrows():
-
-
-    # simulate one month after investment creation
-        simulation_start = customer["last_login_at"]
-
-        month_end = TODAY
-
-        delta = relativedelta(month_end, simulation_start)
-
-        months = max(1,delta.years * 12 + delta.months)
-
-        monthly_logins = np.random.randint(
-            CUSTOMER_BEHAVIOUR_SEGMENT_MAP[customer["customer_behaviour_segment"]]["monthly_logins"][0],
-            CUSTOMER_BEHAVIOUR_SEGMENT_MAP[customer["customer_behaviour_segment"]]["monthly_logins"][1] + 1
-        ,size=months)
+    engagement_sample_df = pd.concat(
+    [active_users_sample, low_activity_users_sample],
+    ignore_index=True)
 
 
-        for idx in range(months):
+    engagement_dict = create_engagement_events(engagement_sample_df)
 
-            current_month_start = (simulation_start+ relativedelta(months=idx))
+    login_engagement_events = engagement_dict['login_events']
+    engagement_events = engagement_dict['engagement_events']
+    wallet_funding_events = engagement_dict['wallet_funding_events']
+    new_investment_creation_events = engagement_dict['investment_events']
 
-            current_month_end = (current_month_start+ relativedelta(months=1))
-
-            days_in_month = (current_month_end - current_month_start).days
-
-            monthly_reviews = np.random.randint(
-            max(1, int(monthly_logins[idx] * 0.15)),
-            max(2, int(monthly_logins[idx] * 0.4)) + 1)
-
-    # Login events
-            login_times = sorted([current_month_start + timedelta(days=np.random.randint(0, days_in_month),hours=np.random.randint(0, 24),minutes=np.random.randint(0, 60))
-                for _ in range(monthly_logins[idx])])
-
-            for login_time in login_times:
-                engagement_events.append({"user_id": customer["user_id"],"event_time": login_time,"event_type": "app_login"})
-
-    # Portfolio reviews must happen after a login
-            if len(login_times) > 0:
-
-                review_login_times = np.random.choice(
-                login_times,
-                size=min(monthly_reviews, len(login_times)),
-                replace=False)
-
-                for login_time in review_login_times:
-
-                    review_time = login_time + timedelta(minutes=np.random.randint(1, 30))
-
-                    engagement_events.append({
-                "user_id": customer["user_id"],
-                "event_time": review_time,
-                "event_type": "review_current_investment"
-            })
-
-    engagement_events_df = pd.DataFrame(engagement_events)
 
     start_position = end_position
-    end_position = start_position + len(engagement_events_df)
+    end_position = start_position + len(login_engagement_events)
 
-    user_ids[start_position:end_position] = (engagement_events_df["user_id"].values)
+    uids = login_engagement_events['user_id']
+    etime = login_engagement_events['event_time']
+    dtypes = [device_type_map.get(uid) for uid in login_engagement_events['user_id']]
 
-    event_time[start_position:end_position] = (engagement_events_df["event_time"])
+    app_login_events(conn, context, start_position, end_position, user_ids, uids, event_time, etime, device_types, dtypes, event_type_ids)
 
-    event_type_ids[start_position:end_position] = [event_type_map.get(event_type)for event_type in engagement_events_df["event_type"]]
-
-    device_types[start_position:end_position] = [device_type_map.get(uid)for uid in engagement_events_df["user_id"]]
-    
-    #portfolio reviews for low activity users
-    low_engagement_events = []
-
-
-    for _, customer in low_activity_users_sample.iterrows():
-
-    # simulate one month after investment creation
-        simulation_start = customer["last_login_time"]
-
-        delta = relativedelta(TODAY, simulation_start)
-
-        months = max(1,delta.years * 12 + delta.months)
-
-        for idx in range(months):
-
-            month_start = (simulation_start + relativedelta(months=idx))
-
-            month_end = (month_start + relativedelta(months=1))
-
-            days_in_month = (month_end - month_start).days
-
-            monthly_logins = np.random.randint(CUSTOMER_BEHAVIOUR_SEGMENT_MAP[customer["customer_behaviour_segment"]]["monthly_logins"][0],CUSTOMER_BEHAVIOUR_SEGMENT_MAP[customer["customer_behaviour_segment"]]["monthly_logins"][1] + 1)
-            monthly_reviews = np.random.randint(max(1, int(monthly_logins * 0.3)),max(2, int(monthly_logins * 0.7)) + 1)
-
-    # Login events
-            login_times = sorted([
-            month_start + timedelta(
-            days=np.random.randint(0, days_in_month),
-            hours=np.random.randint(0, 24),
-            minutes=np.random.randint(0, 60)
-            )for _ in range(monthly_logins)
-        ])
-
-            for login_time in login_times:
-                low_engagement_events.append({
-                "user_id": customer["user_id"],
-                "event_time": login_time,
-                "event_type": "app_login"})
-
-    # Portfolio reviews must happen after a login
-            if len(login_times) > 0:
-
-                review_login_times = np.random.choice(login_times,size=min(monthly_reviews, len(login_times)),replace=False)
-
-                for login_time in review_login_times:
-
-                    review_time = login_time + timedelta(minutes=np.random.randint(1, 30))
-
-                    low_engagement_events.append({
-                    "user_id": customer["user_id"],
-                    "event_time": review_time,
-                    "event_type": "review_current_investment"})
-
-    low_engagement_events_df = pd.DataFrame(low_engagement_events)
-
-    print("Low Engagement Events:", len(low_engagement_events_df))
-
-    
     start_position = end_position
-    end_position = start_position + len(low_engagement_events_df)
+    end_position = start_position + len(engagement_events)
 
+    uids = engagement_events['user_id']
+    etime = engagement_events['event_time']
+    dtypes = [device_type_map.get(uid) for uid in engagement_events['user_id']]
 
+    updated_end_position = review_current_investment_events(conn, context, start_position, end_position, user_ids, uids, event_time, etime, device_types, dtypes, event_type_ids)
 
-    user_ids[start_position:end_position] = (low_engagement_events_df["user_id"].values)
-
-    event_time[start_position:end_position] = (low_engagement_events_df["event_time"])
-
-    event_type_ids[start_position:end_position] = [event_type_map.get(event_type)for event_type in low_engagement_events_df["event_type"]]
-
-    device_types[start_position:end_position] = [device_type_map.get(uid)for uid in low_engagement_events_df["user_id"]]
+    start_position = updated_end_position
+    end_position = start_position + len(wallet_funding_events)
+    
 
 
     # let's simulate new investment creation

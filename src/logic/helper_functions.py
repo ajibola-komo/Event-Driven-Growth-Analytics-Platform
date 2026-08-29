@@ -335,8 +335,6 @@ def investment_creation_events(conn: DuckDBPyConnection, context:any, start_posi
         'all_investment_df':investment_df, 'last_transaction_id':last_transaction_id
     }
     
-    
-
 
 def get_customer_behaviour_segment(conn: DuckDBPyConnection, uids: list[int]) -> pd.DataFrame:
 
@@ -481,7 +479,7 @@ def create_investment_amount(conn:DuckDBPyConnection, uids:list[int]) -> pd.Data
 
     return investments_df
 
-def create_engagement_events(conn:DuckDBPyConnection, engagement_sample_df:pd.DataFrame) -> dict:
+def create_engagement_events(engagement_sample_df:pd.DataFrame) -> dict:
 
     """
         Returns a data dictionary with the following events:
@@ -594,8 +592,28 @@ def create_engagement_events(conn:DuckDBPyConnection, engagement_sample_df:pd.Da
         'investment_events':investment_events
     }
 
+def review_current_investment_events(conn:DuckDBPyConnection, context:any, start_position:int, end_position:int, user_ids:list[int], uids:list[int], event_times:list[pd.Timestamp],
+                                     review_time:list[pd.Timestamp], device_types:list[int], dtypes:list[int], event_type_ids:list[int]) -> int:
                         
+    """
+        Returns the new event end_position
+    """
 
+    login_time = [review - timedelta(minutes = np.random.randint(0,2)) for review in review_time]
+
+    app_login_events(conn, context, start_position, end_position,user_ids, uids, event_times, login_time, device_types, dtypes, event_type_ids)
+
+    start_position = end_position
+    end_position = start_position + len(uids)
+
+    user_ids[start_position:end_position] = uids
+    event_times[start_position:end_position] = review_time
+    device_types[start_position:end_position] = dtypes
+    event_type_ids[start_position:end_position] = [context.review_current_investment_event_type_id] * len(uids)
+
+    updated_end_position = end_position
+
+    return updated_end_position
             
             
                 
