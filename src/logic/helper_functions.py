@@ -157,6 +157,24 @@ def update_wallet_balance(conn:DuckDBPyConnection, uids:list[int], transaction_a
     
     conn.unregister('wallet_activation_df')
 
+def activate_wallet(conn, uids, funding_time):
+
+    activation_df = pd.DataFrame({
+
+        'user_id':uids,
+        'event_time':funding_time
+
+    })
+
+    conn.register('activation_df', activation_df)
+
+    conn.execute('''update dim_wallet as w set wallet_activated_at = a.event_time, last_updated_at = a.event_time, wallet_activated_at_id = CAST(strftime(a.event_time, '%Y%m%d') AS BIGINT) 
+        from activation_df as a where w.user_id = a.user_id
+    ''')
+
+    conn.unregister('activation_df')
+
+
 def deduct_wallet_balance(conn:DuckDBPyConnection, uids:list[int], transaction_amount:list[float], transaction_ids:list[int], event_time:list[pd.Timestamp]) -> None:
 
     transactions_data_df = pd.DataFrame({
@@ -627,7 +645,7 @@ def create_wallet_funding_events(conn:DuckDBPyConnection, context:any, start_pos
     start_position = end_position
     end_position = start_position + len(uids)
 
-    
+
 
     return last_transaction_id
 
