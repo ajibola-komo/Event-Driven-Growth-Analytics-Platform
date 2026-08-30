@@ -330,7 +330,7 @@ def generate_facts(conn, num_of_events):
     start_position = updated_end_position
     end_position = start_position + len(wallet_funding_events)
     
-
+    
 
     # let's simulate new investment creation
 
