@@ -676,13 +676,71 @@ def create_wallet_funding_events(conn:DuckDBPyConnection, context:any, start_pos
     last_transaction_id = transaction_ids.max()
 
     update_wallet_balance(conn, uids, tran_amounts, transaction_ids[start_position:end_position], funding_time)
+
     return {
         "last_transaction_id": last_transaction_id,
         "updated_end_position": end_position}
 
-                 
+def new_investment_creation(conn:DuckDBPyConnection, context:any, start_position:int, end_position:int, user_ids:list[int], uids:list[int], event_times:list[pd.Timestamp],
+                               plan_creation_time:list[pd.Timestamp], investment_type:list[str], device_types:list[str], dtypes:list[str], 
+                               is_money_movement_activities:list[bool], transaction_ids:list[int], last_transaction_id:int, 
+                               transaction_type_ids:list[int], event_type_ids:list[int], plan_ids:list[int], transaction_amounts:list[float], amount_invested:list[float]) -> dict:
+
+    """
+        This function creates new investment creation events for the given users.
+        It returns a dictionary with the following attributes:
+            - all_investment_df: A dataframe with the following attributes:
+                - user_id
+                - wallet_id
+                - plan_id
+                - amount_invested
+                - expected_maturity_value
+                - investment_start_date
+                - investment_start_date_id
+                - investment_maturity_date
+                - investment_maturity_date_id
+            - last_transaction_id: The last transaction id after creating the new investment creation events.
+    """
+
+    login_time = [pst - timedelta(minutes = np.random.randint(20,35)) for pst in plan_creation_time]
+
+    app_login_events(conn, context, start_position, end_position, user_ids, uids, event_times, login_time, device_types, dtypes, event_type_ids)
+
+    start_position = end_position
+    end_position = start_position + len(uids)
+
+    review_time = [lt + timedelta(minutes = np.random.randint(2,5)) for lt in login_time]
+
+    review_plan_options_events(conn, context, start_position, end_position, user_ids, uids, event_times, review_time, event_type_ids, device_types, dtypes)
+
+    start_position = end_position
+    end_position = start_position + len(uids)
+
+    plan_selection_df = plan_selection_events(context, start_position, end_position, user_ids, uids, event_times, review_time, event_type_ids, device_types, dtypes)
+
+    plan_selection_time = plan_selection_df["plan_selection_time"].tolist()
+
+    start_position = end_position
+    end_position = start_position + len(uids)
+
+    investment_creation_dict = investment_creation_events(conn, context, start_position, end_position, user_ids, uids, event_times,
+                                                          plan_selection_time, investment_type, device_types, dtypes,
+                                                          is_money_movement_activities, transaction_ids, last_transaction_id,
+                                                          transaction_type_ids, event_type_ids, plan_ids,
+                                                          transaction_amounts, amount_invested)
 
 
+    last_transaction_id = investment_creation_dict['last_transaction_id']
+    all_investments_df = investment_creation_dict['all_investment_df']
+    updated_end_position = end_position
+
+
+    return {
+        'last_transaction_id':last_transaction_id,
+        'all_investments_df':all_investments_df,
+        'updated_end_position':updated_end_position
+
+    }
 
 
 
