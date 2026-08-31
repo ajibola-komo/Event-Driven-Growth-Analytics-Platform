@@ -11,11 +11,20 @@ load_dotenv()
 FILE_FORMAT_NAME = "my_parquet_format"
 STAGE_NAME = "finflow_stage"
 
-GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
-SNOWFLAKE_GCS_INTEGRATION = os.getenv("SNOWFLAKE_GCS_INTEGRATION")
+AZURE_STORAGE_ACCOUNT_NAME = os.getenv(
+    "AZURE_STORAGE_ACCOUNT_NAME"
+)
+
+AZURE_FILE_SYSTEM_NAME = os.getenv(
+    "AZURE_FILE_SYSTEM_NAME"
+)
+
+SNOWFLAKE_AZURE_INTEGRATION = os.getenv(
+    "SNOWFLAKE_AZURE_INTEGRATION"
+)
 
 
-def upload_from_gcs_to_snowflake():
+def upload_from_adls_to_snowflake():
 
     conn = snowflake.connector.connect(
         **SNOWFLAKE_CONFIG
@@ -25,6 +34,7 @@ def upload_from_gcs_to_snowflake():
 
         cursor = conn.cursor()
 
+        # Create Parquet file format
         cursor.execute(f"""
             CREATE OR REPLACE FILE FORMAT {FILE_FORMAT_NAME}
             TYPE = PARQUET
@@ -32,15 +42,17 @@ def upload_from_gcs_to_snowflake():
             USE_VECTORIZED_SCANNER = TRUE;
         """)
 
+        # Create Azure external stage
         cursor.execute(f"""
             CREATE OR REPLACE STAGE {STAGE_NAME}
-            URL = 'gcs://{GCS_BUCKET_NAME}'
-            STORAGE_INTEGRATION = {SNOWFLAKE_GCS_INTEGRATION}
+            URL = 'azure://{AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_FILE_SYSTEM_NAME}'
+            STORAGE_INTEGRATION = {SNOWFLAKE_AZURE_INTEGRATION}
             FILE_FORMAT = (
                 FORMAT_NAME = '{FILE_FORMAT_NAME}'
             );
         """)
 
+        # Load each table
         for table_name in TABLE_NAMES:
 
             print(f"Loading {table_name}...")
@@ -71,3 +83,4 @@ def upload_from_gcs_to_snowflake():
 
         cursor.close()
         conn.close()
+

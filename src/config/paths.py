@@ -91,7 +91,7 @@ S3_KEYS = [
 
 TABLE_NAMES = ["dim_date","dim_product","dim_user","dim_event_type","dim_plan","dim_wallet","dim_transaction_type","fact_transaction","fact_investment_position","fact_wallet_balance","fact_user_event"]
 
-GCS_FILE_NAMES = [
+ADLS_FILE_NAMES = [
     "dim_date.parquet", "dim_product.parquet", "dim_user.parquet", "dim_event_type.parquet","dim_plan.parquet","dim_wallet.parquet",  "dim_transaction_type.parquet",
     "fact_transaction.parquet","fact_investment_position.parquet","fact_wallet_balance.parquet","fact_user_event.parquet"
 ]
