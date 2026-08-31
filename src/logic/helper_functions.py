@@ -32,14 +32,14 @@ def signup_completion_events(context: any, start_position: int, end_position: in
     event_times[start_position:end_position]= event_time
     device_types[start_position:end_position] = dtypes
 
-    event_type_ids[start_position:end_position] = context.signup_completed_event_type_id
+    event_type_ids[start_position:end_position] = [context.signup_completed_event_type_id] * len(uids)
 
 def app_login_events(conn: DuckDBPyConnection, context: any, start_position: int, end_position: int, user_ids: list, uids: list[int], event_times: list, event_time: list[pd.Timestamp], device_types: list, dtypes: list[str], event_type_ids: list) -> None:
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position]= event_time
     device_types[start_position:end_position] = dtypes
 
-    event_type_ids[start_position:end_position] = context.app_login_event_type_id
+    event_type_ids[start_position:end_position] = [context.app_login_event_type_id] * len(uids)
 
     update_last_login_timestamp(conn, uids,event_time)
 
@@ -74,7 +74,7 @@ def kyc_completion_events(conn: DuckDBPyConnection,context:any,start_position:in
     event_times[start_position:end_position]= event_time
     device_types[start_position:end_position] = dtypes
     
-    event_type_ids[start_position:end_position] = context.kyc_completed_event_type_id
+    event_type_ids[start_position:end_position] = [context.kyc_completed_event_type_id] * len(uids)
 
     kyc_activation_df = pd.DataFrame({
         'user_id':uids,
@@ -121,10 +121,10 @@ def wallet_activation_events(conn: DuckDBPyConnection, context: any, start_posit
     device_types[start_position:end_position] = dtypes
 
     
-    event_type_ids[start_position:end_position] = context.wallet_funded_event_type_id
+    event_type_ids[start_position:end_position] = [context.wallet_funded_event_type_id] * len(uids)
 
     
-    transaction_type_ids[start_position:end_position] = context.wallet_funding_transaction_type_id
+    transaction_type_ids[start_position:end_position] = [context.wallet_funding_transaction_type_id] * len(uids)
 
     wallet_ids[start_position:end_position] = wids
 
@@ -136,7 +136,7 @@ def wallet_activation_events(conn: DuckDBPyConnection, context: any, start_posit
 
     transaction_amounts[start_position:end_position] = tran_amount
 
-    transaction_statuses[start_position:end_position] = "success"
+    transaction_statuses[start_position:end_position] = ["success"] * len(uids)
 
     last_transaction_id = transaction_ids[start_position:end_position].max()
 
@@ -239,7 +239,7 @@ def review_plan_options_events(conn, context, start_position, end_position, user
     user_ids[start_position:end_position] = uids
     event_times[start_position:end_position] = [last_login + timedelta(minutes=np.random.randint(2, 5)) for last_login in login_info["last_login_at"]]
     device_types[start_position:end_position] = dtypes
-    event_type_ids[start_position:end_position] = context.review_plan_options_event_type_id
+    event_type_ids[start_position:end_position] = [context.review_plan_options_event_type_id] * len(uids)
 
 def plan_selection_events(context:any, start_position:int, end_position:int, user_ids:list[int], uids:list[int], event_time:list[pd.Timestamp], plan_review_time:list[pd.Timestamp], event_type_ids:list[int], device_types:list[int], dtypes:list[int]) -> pd.DataFrame:
 
@@ -255,7 +255,7 @@ def plan_selection_events(context:any, start_position:int, end_position:int, use
 
     user_ids[start_position:end_position] = uids
     event_time[start_position:end_position] = plan_selection_time
-    event_type_ids[start_position:end_position] = context.plan_selected_event_type_id
+    event_type_ids[start_position:end_position] = [context.plan_selected_event_type_id] * len(uids)
     device_types[start_position:end_position] = dtypes
 
     plan_selection_df = pd.DataFrame({
@@ -651,7 +651,7 @@ def review_current_investment_events(conn:DuckDBPyConnection, context:any, start
             
 def create_wallet_funding_events(conn:DuckDBPyConnection, context:any, start_position:int, end_position:int, user_ids:list[int], uids:list[int], event_times:list[pd.Timestamp],
                                  funding_time:list[pd.Timestamp], last_transaction_id:int, device_types, dtypes, is_money_movement_activity:list[bool], event_type_ids:list[int], 
-                                 transaction_type_ids:list[int], transaction_amounts:list[float], amount_invested:list[float]) -> int:
+                                 transaction_type_ids:list[int], transaction_amounts:list[float], amount_invested:list[float]) -> dict:
 
 
     login_time = [ft - timedelta(minutes = np.random.randint(4,10)) for ft in funding_time]
