@@ -91,19 +91,28 @@ def wallet_activation_events(conn: DuckDBPyConnection, context: any, start_posit
                              user_ids:list[int], uids:list[int], event_times:list[pd.Timestamp], event_time:list[pd.Timestamp], device_types:list[str],dtypes:list[str],
                              event_type_ids:list[int], wallet_ids:list[int], wids:list[int], is_money_movement_activity:list[bool],
                             transaction_type_ids:list[int], transaction_ids:list[int], transaction_amounts:list[float], 
-                            transaction_statuses:list[str], last_transaction_id:int) -> int:
+                            transaction_statuses:list[str], last_transaction_id:int) -> dict:
 
     """
         This method creates the wallet activation events i.e. a registered user's first funding.
         This methods calls:
-            1) generate_wallet_funding_amount() function to create the funding amounts based on the user's customer behaviour segment.
-            2) update_wallet_balance() function to update the fact_wallet_balance table with the updated transaction amounts.
+            1) app_login_events() function to login first
+            2) generate_wallet_funding_amount() function to create the funding amounts based on the user's customer behaviour segment.
+            3) update_wallet_balance() function to update the fact_wallet_balance table with the updated transaction amounts.
+            4) activate_wallet() to update the dim_wallet table
         
         Returns the last_transaction_id after updating the wallet balance for the given users.
     
     """
 
     #first we need to get the customer behaviour segment to generate the transaction amount for each user
+
+    login_times = [et - timedelta(minutes = np.random.randint(4,8)) for et in event_time]
+
+    app_login_events(conn, context, start_position, end_position, user_ids, uids, event_times, login_times, device_types, dtypes, event_type_ids)
+
+    start_position = end_position
+    end_position = start_position + len(uids)
 
     tran_amount = generate_wallet_funding_amounts(conn, uids)
     
@@ -133,7 +142,14 @@ def wallet_activation_events(conn: DuckDBPyConnection, context: any, start_posit
 
     update_wallet_balance(conn, uids, tran_amount, tran_ids, event_time)
 
-    return last_transaction_id
+    activate_wallet(conn, uids, event_time)
+
+    updated_end_position = end_position
+
+    return {
+        'last_transaction_id':last_transaction_id,
+        'updated_end_position':updated_end_position
+        }
 
 def update_wallet_balance(conn:DuckDBPyConnection, uids:list[int], transaction_amount:list[float], transaction_ids:list[int], event_time:list[pd.Timestamp]) -> None:
 

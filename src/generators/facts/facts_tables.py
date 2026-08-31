@@ -170,11 +170,14 @@ def generate_facts(conn, num_of_events):
     dtypes = np.array([device_type_map.get(uid) for uid in wallet_activated_users["user_id"]])
     wids = [wallet_id_map.get(uid) for uid in wallet_activated_users["user_id"]]
     
-    last_transaction_id = wallet_activation_events(
+    return_dict = wallet_activation_events(
         conn, context, start_position, end_position,user_ids, uids, event_time, etime,
     device_types, dtypes, event_type_ids, wallet_ids, wids, is_money_movement_activities, transaction_type_ids, transaction_ids, transaction_amounts,
     wallet_activated_users["amount_invested"],transaction_statuses, last_transaction_id
     )
+
+    last_transaction_id = return_dict['last_transaction_id']
+    end_position = return_dict['updated_end_position']
     
 
     #let's create the initial investment -- login, review_plan_options then drop off for some users, and for others, they will make an investment after reviewing the plan options. We will create a new dataframe to hold the users who made an investment and their corresponding investment details.
