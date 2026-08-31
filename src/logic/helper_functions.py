@@ -651,7 +651,7 @@ def review_current_investment_events(conn:DuckDBPyConnection, context:any, start
             
 def create_wallet_funding_events(conn:DuckDBPyConnection, context:any, start_position:int, end_position:int, user_ids:list[int], uids:list[int], event_times:list[pd.Timestamp],
                                  funding_time:list[pd.Timestamp], last_transaction_id:int, device_types, dtypes, is_money_movement_activity:list[bool], event_type_ids:list[int], 
-                                 transaction_type_ids:list[int], transaction_amounts:list[float], amount_invested:list[float]) -> dict:
+                                 transaction_type_ids:list[int], transaction_ids:list[int], transaction_amounts:list[float]) -> dict:
 
 
     login_time = [ft - timedelta(minutes = np.random.randint(4,10)) for ft in funding_time]
@@ -661,9 +661,24 @@ def create_wallet_funding_events(conn:DuckDBPyConnection, context:any, start_pos
     start_position = end_position
     end_position = start_position + len(uids)
 
+    user_ids[start_position:end_position] = uids
+    event_times[start_position:end_position] = funding_time
+    is_money_movement_activity[start_position:end_position] = [True] * len(uids)
+    device_types[start_position:end_position] = dtypes
+    event_type_ids[start_position:end_position] = [context.wallet_funded_event_type_id] * len(uids)
 
+    tran_amounts = generate_wallet_funding_amounts(conn, uids)
 
-    return last_transaction_id
+    transaction_type_ids[start_position:end_position] = [context.wallet_funding_transaction_type_id] * len(uids)
+    transaction_amounts[start_position:end_position] = tran_amounts
+    is_money_movement_activity[start_position:end_position] = [True] * len(uids)
+    transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id + len(uids) + 1)
+    last_transaction_id = transaction_ids.max()
+
+    update_wallet_balance(conn, uids, tran_amounts, transaction_ids[start_position:end_position], funding_time)
+    return {
+        "last_transaction_id": last_transaction_id,
+        "updated_end_position": end_position}
 
                  
 
