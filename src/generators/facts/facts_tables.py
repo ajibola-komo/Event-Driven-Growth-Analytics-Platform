@@ -369,7 +369,18 @@ def generate_facts(conn, num_of_events):
 
     all_investments_df.loc[tenure_days_mask,"investment_maturity_date_id"] = np.array([int(pd.Timestamp(ts).strftime('%Y%m%d'))for ts in all_investments_df.loc[tenure_days_mask,"investment_maturity_date"]], dtype=np.int32)
 
-    
+    users_behaviour_segment_df = get_customer_behaviour_segment(conn, all_investments_df["user_id"])
+
+    conn.register('all_investments_df', all_investments_df)
+
+    plan_names = conn.execute('''select f.user_id, f.plan_id, p.plan_name from all_investments_df as f inner join dim_plan p on f.plan_id = p.plan_id''').df()
+
+    all_investments_df = all_investments_df.merge(plan_names, how="inner", on=["user_id","plan_id"])
+
+    conn.unregister('all_investments_df')
+
+    all_investments_df = all_investments_df.merge(users_behaviour_segment_df, how="inner", on="user_id")
+
     #let's split into vestable investments and saleable investments
     vestable_investments_df = all_investments_df[(all_investments_df["tenure_days"].notna()) & (all_investments_df["investment_status"] == "Matured")].copy()
 
@@ -392,8 +403,10 @@ def generate_facts(conn, num_of_events):
     vestable_investments_df.loc[early_withdrawal_mask,"investment_status"] = "Withdrawn Early"
     vestable_investments_df.loc[vested_invested_mask,"investment_status"] = "Redeemed"
 
+    early_withrawal_df = vestable_investments_df.loc[early_withdrawal_mask]
 
-    #let's create the simulate early investment events
+
+    #let's create the simulate early withdrawal events
     
     vestable_investments_df.loc[early_withdrawal_mask,"days_before_maturity"] = [
     int(
@@ -434,7 +447,7 @@ def generate_facts(conn, num_of_events):
 
     user_ids[start_position:end_position] = vestable_investments_df.loc[early_withdrawal_mask,"user_id"]
     event_time[start_position:end_position] = vestable_investments_df.loc[early_withdrawal_mask,"withdrawal_request_login_time"]
-    event_type_ids[start_position:end_position] = [event_type_map.get("app_login") for _ in range(early_withdrawal_mask.sum())]
+    event_type_ids[start_position:end_position] = [context.app_login_event_type_id] * early_withdrawal_mask.sum()
     device_types[start_position:end_position] = [device_type_map.get(uid) for uid in vestable_investments_df.loc[early_withdrawal_mask,"user_id"]]
     update_last_login_timestamp(conn, user_ids[start_position:end_position], event_time[start_position:end_position])
 
@@ -443,7 +456,7 @@ def generate_facts(conn, num_of_events):
 
     user_ids[start_position:end_position] = vestable_investments_df.loc[early_withdrawal_mask,"user_id"]
     event_time[start_position:end_position] = vestable_investments_df.loc[early_withdrawal_mask,"withdrawal_request_date"]
-    event_type_ids[start_position:end_position] = [event_type_map.get("request_early_withdrawal") for _ in range(early_withdrawal_mask.sum())]
+    event_type_ids[start_position:end_position] = [context.request_early_withdrawal_event_type_id] * early_withdrawal_mask.sum()
     device_types[start_position:end_position] = [device_type_map.get(uid) for uid in vestable_investments_df.loc[early_withdrawal_mask,"user_id"]]
 
     
@@ -453,7 +466,7 @@ def generate_facts(conn, num_of_events):
 
     user_ids[start_position:end_position] = vestable_investments_df.loc[early_withdrawal_mask,"user_id"]
     event_time[start_position:end_position] = (vestable_investments_df.loc[early_withdrawal_mask,"withdrawal_request_date"] + pd.to_timedelta(INVESTMENT_WITHDRAWAL_PROCESSING_TIME,unit='m'))
-    event_type_ids[start_position:end_position] = [event_type_map.get("investment_proceeds_wallet_transfer") for _ in range(early_withdrawal_mask.sum())]
+    event_type_ids[start_position:end_position] = [context.investment_proceeds_wallet_transfer_event_type_id] * early_withdrawal_mask.sum()
     device_types[start_position:end_position] = [device_type_map.get(uid) for uid in vestable_investments_df.loc[early_withdrawal_mask,"user_id"]]
     wallet_ids[start_position:end_position] = [wallet_id_map.get(uid) for uid in vestable_investments_df.loc[early_withdrawal_mask,"user_id"]]
     is_money_movement_activities[start_position:end_position] = True

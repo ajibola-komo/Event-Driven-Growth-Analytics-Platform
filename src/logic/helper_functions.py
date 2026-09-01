@@ -274,14 +274,15 @@ def plan_ids_allocation(conn:DuckDBPyConnection, context:any, uids:list[int], in
             - user_id
             - investment_type
             - plan_id
+            - plan_name
             - plan_selection_time
             - event_type_ids(the event type ids are already pre-allocated)
             - transaction_type_ids (the transaction type ids are already pre-allocated)
     """
 
-    savings_plans = conn.execute('''select plan_id, plan_weight from dim_plan where plan_category = 'Savings' ''').df()
+    savings_plans = conn.execute('''select plan_id, plan_name, plan_weight from dim_plan where plan_category = 'Savings' ''').df()
 
-    investment_plans = conn.execute('''select plan_id, plan_weight from dim_plan where plan_category = 'Investments' ''').df()
+    investment_plans = conn.execute('''select plan_id, plan_name, plan_weight from dim_plan where plan_category = 'Investments' ''').df()
 
     total_plans = len(uids)
 
@@ -289,7 +290,7 @@ def plan_ids_allocation(conn:DuckDBPyConnection, context:any, uids:list[int], in
 
     event_type_ids = np.empty(total_plans, dtype=np.int64)
 
-    transaction_types_ids = context.investment_funding_transaction_type_id
+    transaction_types_ids = [context.investment_funding_transaction_type_id] * total_plans
 
     plan_ids_allocation_df = pd.DataFrame({
         'user_id':uids,
@@ -315,6 +316,14 @@ def plan_ids_allocation(conn:DuckDBPyConnection, context:any, uids:list[int], in
     plan_ids_allocation_df.loc[investment_mask, "plan_id"] = np.random.choice(investment_plans["plan_id"], 
                                                                            p = investment_plans["plan_weight"] / investment_plans["plan_weight"].sum(),
                                                                            size = investment_mask.sum())
+
+    conn.register('plan_ids_allocation_df', plan_ids_allocation_df)
+
+    plan_names = conn.execute('''SELECT f.user_id, f.plan_id, p.plan_name from dim_plan p inner join plan_ids_allocation_df f on p.plan_id = f.plan_id''').df()
+
+    plan_ids_allocation_df = plan_ids_allocation_df.merge(plan_names, how="inner", on=["user_id","plan_id"])
+
+    conn.unregister('plan_ids_allocation_df')
 
     return plan_ids_allocation_df
 
@@ -740,6 +749,17 @@ def new_investment_creation(conn:DuckDBPyConnection, context:any, start_position
         'all_investments_df':all_investments_df,
         'updated_end_position':updated_end_position
 
+    }
+
+def early_withdrawal_requests_events(context, start_position, end_position, user_ids, uids, is_money_movement_activity, last_transaction_id, event_times, device_types, dtypes, 
+                                     early_withdrawal_requests_df, event_type_ids, transaction_types_ids, transaction_amounts) -> dict:
+
+
+
+    
+
+    return {
+        'last_transaction_id':last_transaction_id
     }
 
 
