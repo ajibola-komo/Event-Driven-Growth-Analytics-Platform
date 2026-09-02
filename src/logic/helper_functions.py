@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 from datetime import timedelta
-from src.config.constants import (CUSTOMER_BEHAVIOUR_SEGMENT_MAP, USERS_MAKES_FIRST_INVESTMENT_AFTER_FUNDING, FIRST_INVESTMENT_TYPE, TODAY, EARLY_WITHDRAWAL_BEHAVIOUR)
+from src.config.constants import (CUSTOMER_BEHAVIOUR_SEGMENT_MAP, USERS_MAKES_FIRST_INVESTMENT_AFTER_FUNDING, FIRST_INVESTMENT_TYPE, TODAY, EARLY_WITHDRAWAL_BEHAVIOUR,
+                                    INVESTMENT_WITHDRAWAL_PROCESSING_TIME)
 from duckdb import DuckDBPyConnection
 from dateutil.relativedelta import relativedelta
 from src.logic.EventContext import (load_event_context)
@@ -751,8 +752,8 @@ def new_investment_creation(conn:DuckDBPyConnection, context:any, start_position
 
     }
 
-def early_withdrawal_requests_events(conn,context, start_position, end_position, user_ids, is_money_movement_activity, last_transaction_id, event_times, device_types, dtypes, 
-                                     early_withdrawal_requests_df, event_type_ids, transaction_types_ids, transaction_amounts) -> dict:
+def early_withdrawal_requests_events(conn,context, start_position, end_position, user_ids, wallet_ids, is_money_movement_activity, last_transaction_id, event_times, device_types, dtypes, 
+                                     early_withdrawal_requests_df, event_type_ids, transaction_types_ids,transaction_ids, transaction_amounts) -> dict:
 
 
 
@@ -785,19 +786,23 @@ def early_withdrawal_requests_events(conn,context, start_position, end_position,
 
     user_ids[start_position:end_position] = early_withdrawal_requests_df['user_id']
     event_times[start_position:end_position] = early_withdrawal_requests_df['withdrawal_request_date']
-    event_type_ids[start_position:end_position] = [context.request_early_withdrawal_event_type_id] * len()
+    event_type_ids[start_position:end_position] = [context.request_early_withdrawal_event_type_id] * len(early_withdrawal_requests_df)
     device_types[start_position:end_position] = dtypes
 
     #investment_proceeds_wallet_transfer
     start_position = end_position
     end_position = start_position + len(early_withdrawal_requests_df)
 
-    
-
-
-
-    
-
+    user_ids[start_position:end_position] = early_withdrawal_requests_df['user_id']
+    event_times[start_position:end_position] = [early_withdrawal_requests_df['withdrawal_request_date'] + timedelta(minutes = INVESTMENT_WITHDRAWAL_PROCESSING_TIME)]
+    is_money_movement_activity[start_position:end_position] = [True] * len(early_withdrawal_requests_df)
+    event_type_ids[start_position:end_position] = [context.investment_proceeds_wallet_transfer_event_type_id] * len(early_withdrawal_requests_df)
+    transaction_types_ids[start_position:end_position] = [context.investment_proceeds_transfer_transaction_type_id] * len(early_withdrawal_requests_df)
+    transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id + 1 + len(early_withdrawal_requests_df))    
+    device_types[start_position:end_position] = dtypes
+    last_transaction_id = transaction_ids[start_position:end_position].max()
+    wallet_ids[start_position:end_position] = early_withdrawal_requests_df['user_id']
+    transaction_amounts[start_position:end_position] = early_withdrawal_requests_df['amount_invested'] 
     
 
     return {
