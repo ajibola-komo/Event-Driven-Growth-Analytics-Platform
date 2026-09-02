@@ -360,8 +360,6 @@ def generate_facts(conn, num_of_events):
 )
     end_position = return_dict["updated_end_position"]
 
-
-
     all_investments_df["investment_status"] = np.select([all_investments_df["investment_maturity_date"] < pd.Timestamp.today()],
     ["Matured"],default="Active")
 
@@ -373,7 +371,7 @@ def generate_facts(conn, num_of_events):
 
     conn.register('all_investments_df', all_investments_df)
 
-    plan_names = conn.execute('''select f.user_id, f.plan_id, p.plan_name from all_investments_df as f inner join dim_plan p on f.plan_id = p.plan_id''').df()
+    plan_names = conn.execute('''select f.user_id, f.plan_id, p.plan_name, p.penalty_rate_pct from all_investments_df as f inner join dim_plan p on f.plan_id = p.plan_id''').df()
 
     all_investments_df = all_investments_df.merge(plan_names, how="inner", on=["user_id","plan_id"])
 

@@ -753,7 +753,7 @@ def new_investment_creation(conn:DuckDBPyConnection, context:any, start_position
     }
 
 def early_withdrawal_requests_events(conn,context, start_position, end_position, user_ids, wallet_ids, is_money_movement_activity, last_transaction_id, event_times, device_types, dtypes, 
-                                     early_withdrawal_requests_df, event_type_ids, transaction_types_ids,transaction_ids, transaction_amounts) -> dict:
+                                     early_withdrawal_requests_df, event_type_ids, transaction_types_ids,transaction_ids, transaction_amounts, transaction_statuses) -> dict:
 
 
 
@@ -802,7 +802,10 @@ def early_withdrawal_requests_events(conn,context, start_position, end_position,
     device_types[start_position:end_position] = dtypes
     last_transaction_id = transaction_ids[start_position:end_position].max()
     wallet_ids[start_position:end_position] = early_withdrawal_requests_df['user_id']
-    transaction_amounts[start_position:end_position] = early_withdrawal_requests_df['amount_invested'] 
+    early_withdrawal_requests_df['penalty_amount'] = early_withdrawal_requests_df['amount_invested']  * (early_withdrawal_requests_df['penalty_rate_pct'] / 100)
+    transaction_amounts[start_position:end_position] = early_withdrawal_requests_df['amount_invested']  - early_withdrawal_requests_df['penalty_amount']
+    early_withdrawal_requests_df['investment_status'] = "Redeemed"
+    
     
 
     return {
