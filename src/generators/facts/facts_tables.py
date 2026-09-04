@@ -11,7 +11,7 @@ from dateutil.relativedelta import relativedelta
 from src.logic.helper_functions import (update_last_login_timestamp, signup_completion_events, app_login_events, get_last_login, kyc_completion_events,
                                         wallet_activation_events, get_current_wallet_balance, review_plan_options_events, plan_selection_events, plan_ids_allocation, build_investment_creation_users_dataframe,
                                         investment_creation_events, get_customer_behaviour_segment, create_engagement_events, review_current_investment_events, create_wallet_funding_events,
-                                        new_investment_creation, early_withdrawal_requests_events, vested_investments_events )
+                                        new_investment_creation, early_withdrawal_requests_events, vested_investments_events, vested_investments_proceeds_transfer_events )
 from src.logic.EventContext import (load_event_context)
 
 
@@ -434,23 +434,11 @@ def generate_facts(conn, num_of_events):
     start_position = end_position
     end_position = start_position + len(vested_investments_df)
 
-    user_ids[start_position:end_position] = vestable_investments_df.loc[vested_invested_mask,"user_id"]
-    event_time[start_position:end_position] = (vestable_investments_df.loc[vested_invested_mask,"investment_maturity_date"])
-    event_type_ids[start_position:end_position] = [event_type_map.get("investment_proceeds_wallet_transfer") for _ in range(vested_invested_mask.sum())]
-    device_types[start_position:end_position] = [device_type_map.get(uid) for uid in vestable_investments_df.loc[vested_invested_mask,"user_id"]]
+    dtypes = [device_type_map.get(uid) for uid in vested_investments_df['user_id']]
 
-    wallet_ids[start_position:end_position] = [wallet_id_map.get(uid) for uid in vestable_investments_df.loc[vested_invested_mask,"user_id"]]
-    is_money_movement_activities[start_position:end_position] = True
-    transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, 1 + vested_invested_mask.sum() +  last_transaction_id)
-    last_transaction_id = transaction_ids[start_position:end_position].max()
-    amount_invested[start_position:end_position] = vestable_investments_df.loc[vested_invested_mask,"amount_invested"]
-    transaction_type_ids[start_position:end_position] = [transaction_type_map.get("investment_proceeds_transfer") for _ in range(vested_invested_mask.sum())]
-    vestable_investments_df.loc[vested_invested_mask,"investment_status"] = "Redeemed"
-    investment_ids[start_position:end_position] = vestable_investments_df.loc[vested_invested_mask,"investment_id"]
-    transaction_amounts[start_position:end_position] = vestable_investments_df.loc[vested_invested_mask,"amount_invested"]
-    transaction_statuses[start_position:end_position] = ["success" for _ in range(len(vestable_investments_df.loc[vested_invested_mask,"amount_invested"]))]
-
-
+    vested_investments_proceeds_transfer_events(conn, context, start_position, end_position, user_ids, event_time, wallet_ids, last_transaction_id, is_money_movement_activities,
+                                                transaction_type_ids, transaction_ids, transaction_amounts, transaction_statuses, event_type_ids, device_types, dtypes, vested_investments_df)
+    
     # now let's model asset sales
     eligible_saleable_investments = saleable_investments_df[(pd.Timestamp.today() - saleable_investments_df["investment_start_date"]) > pd.Timedelta(days=200)]
     saleable_investments_df_subset = eligible_saleable_investments.sample(frac=0.45).copy()

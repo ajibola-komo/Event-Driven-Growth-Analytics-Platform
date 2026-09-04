@@ -831,7 +831,7 @@ def early_withdrawal_requests_events(conn:DuckDBPyConnection,context:any, start_
     }
 
 def vested_investments_events(context:any, start_position:int, end_position:int, user_ids:list[int], event_time:list[pd.Timestamp], event_type_ids:list[int], device_types:list[str], dtypes:list[str],
-                              vestable_investment_df:pd.DataFrame):
+                              vestable_investment_df:pd.DataFrame) -> None:
 
 
     user_ids[start_position:end_position] = vestable_investment_df['user_id']
@@ -839,6 +839,41 @@ def vested_investments_events(context:any, start_position:int, end_position:int,
     device_types[start_position:end_position] = dtypes
     event_time[start_position:end_position] = vestable_investment_df['investment_maturity_date']
 
+
+def vested_investments_proceeds_transfer_events(conn:DuckDBPyConnection, context:any, start_position:int, end_position:int, user_ids:list[int], event_time:list[pd.Timestamp], 
+                                                wallet_ids:list[int], last_transaction_id:int,is_money_movement_activity:list[bool],transaction_type_ids:list[int], transaction_ids:list[int], 
+                                                transaction_amounts:list[float], transaction_statuses:list[str],
+                                                event_type_ids:list[int], device_types:list[str], dtypes:list[str], 
+                                                vested_investment_df:pd.DataFrame) -> dict:
+
+    user_ids[start_position:end_position] = vested_investment_df['user_id']
+    wallet_ids[start_position:end_position] = vested_investment_df['user_id']
+    is_money_movement_activity[start_position:end_position] = [True] * len(vested_investment_df)
+    event_type_ids[start_position:end_position] = [context.investment_proceeds_wallet_transfer_event_type_id] * len(vested_investment_df)
+    device_types[start_position:end_position] = dtypes
+    transaction_type_ids[start_position:end_position] = [context.investment_proceeds_transfer_transaction_type_id] * len(vested_investment_df)
+    transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id + 1 + len(vested_investment_df))
+    transaction_amounts[start_position:end_position] = vested_investment_df['expected_maturity_value']
+    transaction_statuses[start_position:end_position] = ["Success"] * len(vested_investment_df)
+    event_time[start_position:end_position] = vested_investment_df['investment_maturity_date'] + timedelta(minutes = INVESTMENT_WITHDRAWAL_PROCESSING_TIME)
+    vested_investment_df['investment_status'] = "Redeemed"
+    vested_investment_df['amount_paid_out'] = vested_investment_df['expected_maturity_value']
+    vested_investment_df['is_withdrawn_early'] = False
+    vested_investment_df['early_withdrawal_date'] = None
+    vested_investment_df['early_withdrawal_date_id'] = None
+    vested_investment_df['last_updated_at'] = event_time[start_position:end_position]
+    vested_investment_df['created_at'] = vested_investment_df['investment_start_date']
+    vested_investment_df['wallet_id'] = vested_investment_df['user_id']
+
+    last_transaction_id = transaction_ids[start_position:end_position].max()
+
+    update_wallet_balance(conn,vested_investment_df['user_id'], vested_investment_df['amount_paid_out'],
+                          transaction_ids[start_position:end_position],event_time[start_position:end_position]  )
+
+    return {
+        'last_transaction_id':last_transaction_id,
+        'vested_investment_df':vested_investment_df
+    }
         
 
         
