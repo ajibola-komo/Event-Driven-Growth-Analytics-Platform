@@ -191,7 +191,6 @@ def activate_wallet(conn, uids, funding_time):
 
     conn.unregister('activation_df')
 
-
 def deduct_wallet_balance(conn:DuckDBPyConnection, uids:list[int], transaction_amount:list[float], transaction_ids:list[int], event_time:list[pd.Timestamp]) -> None:
 
     transactions_data_df = pd.DataFrame({
@@ -439,7 +438,6 @@ def get_plan_attributes(conn:DuckDBPyConnection, uids:list[int], plan_ids:list[i
         conn.unregister('plan_ids_df')
 
     return plan_attributes_df
-
 
 def generate_wallet_funding_amounts(conn: DuckDBPyConnection, uids:list[int]) -> list[float]:
 
@@ -883,8 +881,47 @@ def assets_sale_events(context:any, start_position:int, end_position:int, user_i
     event_type_ids[start_position:end_position] = [context.assets_sale_event_type_id] * len(saleable_investments_df)
     device_types[start_position:end_position] = dtypes
 
-        
-        
+def assets_sale_investment_proceeds_wallet_transfer(conn:DuckDBPyConnection, context:any, start_position:int, end_position:int, user_ids:list[int], wallet_ids:list[int],
+                                                    event_time:list[pd.Timestamp], device_types:list[str], dtypes, transaction_type_ids:list[int], transaction_ids:list[int],
+                                                    last_transaction_id:int, event_type_ids, is_money_movement_activity:list[bool], transaction_amounts:list[float], traansaction_statuses:list[str],
+                                                    saleable_investment_df:pd.DataFrame) -> dict:
+
+    saleable_investment_df = saleable_investment_df.copy()
+
+    user_ids[start_position:end_position] = saleable_investment_df['user_id']
+    event_time[start_position:end_position] = (saleable_investment_df['redemption_request_date'] + timedelta(minutes=INVESTMENT_WITHDRAWAL_PROCESSING_TIME))
+    is_money_movement_activity[start_position:end_position] = [True] * len(saleable_investment_df)
+    device_types[start_position:end_position] = dtypes
+    event_type_ids[start_position:end_position] = [context.investment_proceeds_wallet_transfer_event_type_id] * len(saleable_investment_df)
+    transaction_type_ids[start_position:end_position] = [context.investment_proceeds_transfer_transaction_type_id] * len(saleable_investment_df)
+    transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id + 1 + len(saleable_investment_df))
+    last_transaction_id = transaction_ids[start_position:end_position].max()
+    wallet_ids[start_position:end_position] = saleable_investment_df['user_id']
+
+    #get interest rate
+    saleable_investment_df['interest_rate'] = np.random.randint(8,19,size=len(saleable_investment_df))
+    saleable_investment_df['amount_paid_out'] = saleable_investment_df['amount_invested'] * (1 + (saleable_investment_df['interest_rate']/100))
+    transaction_amounts[start_position:end_position] = saleable_investment_df['amount_paid_out']
+    traansaction_statuses[start_position:end_position] = ["success"] * len(saleable_investment_df)
+    saleable_investment_df['investment_status'] = ["Redeemed"] * len(saleable_investment_df)
+    saleable_investment_df['is_withdrawn_early'] = False
+    saleable_investment_df['penalty_amount'] = 0.0
+    saleable_investment_df['early_withdrawal_date'] = None
+    saleable_investment_df['early_withdrawal_date_id'] = None
+    saleable_investment_df['created_at'] = saleable_investment_df['investment_start_date']
+    saleable_investment_df['last_updated_at'] = event_time[start_position:end_position]
+
+    update_wallet_balance(conn, saleable_investment_df['user_id'], transaction_amounts[start_position:end_position], transaction_ids[start_position:end_position], event_time[start_position:end_position])
+
+    return {
+        'last_transaction_id': last_transaction_id,
+        'saleable_investments_df':saleable_investment_df
+    }
+
+
+
+
+    
 
 
 

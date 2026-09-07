@@ -494,6 +494,7 @@ def generate_facts(conn, num_of_events):
     assets_sale_events(context, start_position, end_position, user_ids, event_time, event_type_ids, device_types, dtypes, saleable_investments_df_subset)
 
     saleable_investments_df_subset["investment_maturity_date"] = saleable_investments_df_subset["redemption_request_date"]
+    saleable_investments_df_subset['investment_maturity_date_id'] = (pd.to_datetime(saleable_investments_df_subset["redemption_request_date"]).dt.strftime('%Y%m%d').astype(int))
 
     start_position = end_position
     end_position = start_position + len(saleable_investments_df_subset)
