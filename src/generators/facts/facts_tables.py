@@ -11,7 +11,8 @@ from dateutil.relativedelta import relativedelta
 from src.logic.helper_functions import (update_last_login_timestamp, signup_completion_events, app_login_events, get_last_login, kyc_completion_events,
                                         wallet_activation_events, get_current_wallet_balance, review_plan_options_events, plan_selection_events, plan_ids_allocation, build_investment_creation_users_dataframe,
                                         investment_creation_events, get_customer_behaviour_segment, create_engagement_events, review_current_investment_events, create_wallet_funding_events,
-                                        new_investment_creation, early_withdrawal_requests_events, vested_investments_events, vested_investments_proceeds_transfer_events )
+                                        new_investment_creation, early_withdrawal_requests_events, vested_investments_events, vested_investments_proceeds_transfer_events,
+                                         assets_sale_events )
 from src.logic.EventContext import (load_event_context)
 
 
@@ -478,34 +479,20 @@ def generate_facts(conn, num_of_events):
 
     saleable_investments_df_subset["investment_status"] = "Redeemed"
 
-    #let's model the login first
+    #let's model the login first and review of current investments
     start_position = end_position
     end_position = start_position + len(saleable_investments_df_subset)
 
-    user_ids[start_position:end_position] = saleable_investments_df_subset["user_id"].values
-    event_time[start_position:end_position] = saleable_investments_df_subset["redemption_request_login_date"]
-    device_types[start_position:end_position] = [device_type_map.get(uid) for uid in saleable_investments_df_subset["user_id"]]
-    event_type_ids[start_position:end_position] = [event_type_map.get("app_login") for _ in range(len(saleable_investments_df_subset))]
-    update_last_login_timestamp(conn, user_ids[start_position:end_position], event_time[start_position:end_position])
-    
 
-    #current investment review events
-    start_position = end_position
-    end_position = start_position + len(saleable_investments_df_subset)
-
-    user_ids[start_position:end_position] = saleable_investments_df_subset["user_id"].values
-    event_time[start_position:end_position] = saleable_investments_df_subset["review_current_investment_date"]
-    device_types[start_position:end_position] = [device_type_map.get(uid) for uid in saleable_investments_df_subset["user_id"]]
-    event_type_ids[start_position:end_position] = [event_type_map.get("review_current_investment") for _ in range(len(saleable_investments_df_subset))]
+    review_current_investment_events(conn, context, start_position, end_position, user_ids,saleable_investments_df_subset["user_id"].values,saleable_investments_df_subset["review_current_investment_date"],
+                                      device_types, dtypes, event_type_ids)
 
     start_position = end_position
     end_position = start_position + len(saleable_investments_df_subset)
 
-    user_ids[start_position:end_position] = saleable_investments_df_subset["user_id"].values
-    event_time[start_position:end_position] = saleable_investments_df_subset["redemption_request_date"]
-    device_types[start_position:end_position] = [device_type_map.get(uid) for uid in saleable_investments_df_subset["user_id"]]
-    event_type_ids[start_position:end_position] = [event_type_map.get("assets_sale") for _ in range(len(saleable_investments_df_subset))]
-    investment_ids[start_position:end_position] = saleable_investments_df_subset["investment_id"].values
+    dtypes = [device_type_map.get(uid) for uid in saleable_investments_df_subset["user_id"]]
+    assets_sale_events(context, start_position, end_position, user_ids, event_time, event_type_ids, device_types, dtypes, saleable_investments_df_subset)
+
     saleable_investments_df_subset["investment_maturity_date"] = saleable_investments_df_subset["redemption_request_date"]
 
     start_position = end_position
@@ -525,8 +512,6 @@ def generate_facts(conn, num_of_events):
     transaction_amounts[start_position:end_position] = saleable_investments_df_subset["amount_invested"].values
     transaction_statuses[start_position:end_position] = ["success" for _ in range(len(saleable_investments_df_subset))]
 
-
-    redeemed_ids = saleable_investments_df_subset["investment_id"]
 
     saleable_investments_df.loc[
     saleable_investments_df["investment_id"].isin(redeemed_ids),

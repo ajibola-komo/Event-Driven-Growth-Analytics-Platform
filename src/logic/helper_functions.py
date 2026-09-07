@@ -875,6 +875,13 @@ def vested_investments_proceeds_transfer_events(conn:DuckDBPyConnection, context
         'vested_investment_df':vested_investment_df
     }
         
+def assets_sale_events(context:any, start_position:int, end_position:int, user_ids:list[int], event_time:list[pd.Timestamp], event_type_ids:list[int], device_types:list[str], dtypes:list[str],
+                        saleable_investments_df:pd.DataFrame) -> None:
+
+    user_ids[start_position:end_position] = saleable_investments_df['user_id']
+    event_time[start_position:end_position] = saleable_investments_df['redemption_request_date']
+    event_type_ids[start_position:end_position] = [context.assets_sale_event_type_id] * len(saleable_investments_df)
+    device_types[start_position:end_position] = dtypes
 
         
         
