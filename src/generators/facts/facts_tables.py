@@ -48,8 +48,6 @@ def generate_facts(conn, num_of_events):
     
     wallet_id_map = dict(zip(user_wallet_data["user_id"],user_wallet_data["wallet_id"]))
 
-    plan_id_map = dict(zip(plans_data["plan_id"],plans_data["tenure_days"]))
-
     event_time = np.empty(num_of_events, dtype=object)
 
     user_ids = np.empty(num_of_events, dtype=object)
@@ -79,8 +77,6 @@ def generate_facts(conn, num_of_events):
     transaction_amounts = np.zeros(num_of_events, dtype=np.float64)
     transaction_statuses = np.empty(num_of_events, dtype = object)
     is_withdrawn_early = np.full(num_of_events,False,dtype=bool)
-    early_withdrawal_dates = np.empty(num_of_events,dtype=object)
-    early_withdrawal_date_id = np.empty(num_of_events, dtype=object)
 
 
     # new user signups
