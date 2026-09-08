@@ -12,7 +12,7 @@ from src.logic.helper_functions import (update_last_login_timestamp, signup_comp
                                         wallet_activation_events, get_current_wallet_balance, review_plan_options_events, plan_selection_events, plan_ids_allocation, build_investment_creation_users_dataframe,
                                         investment_creation_events, get_customer_behaviour_segment, create_engagement_events, review_current_investment_events, create_wallet_funding_events,
                                         new_investment_creation, early_withdrawal_requests_events, vested_investments_events, vested_investments_proceeds_transfer_events,
-                                         assets_sale_events )
+                                         assets_sale_events, assets_sale_investment_proceeds_wallet_transfer_events )
 from src.logic.EventContext import (load_event_context)
 
 
@@ -499,39 +499,20 @@ def generate_facts(conn, num_of_events):
     start_position = end_position
     end_position = start_position + len(saleable_investments_df_subset)
 
-    user_ids[start_position:end_position] = saleable_investments_df_subset["user_id"].values
-    event_time[start_position:end_position] = saleable_investments_df_subset["redemption_request_processing_date"]
-    device_types[start_position:end_position] = [device_type_map.get(uid) for uid in saleable_investments_df_subset["user_id"]]
-    event_type_ids[start_position:end_position] = [event_type_map.get("investment_proceeds_wallet_transfer") for _ in range(len(saleable_investments_df_subset))]
-    investment_ids[start_position:end_position] = saleable_investments_df_subset["investment_id"].values
-    is_money_movement_activities[start_position:end_position] = True
-    transaction_ids[start_position:end_position] = np.arange(last_transaction_id + 1, last_transaction_id + 1 + len(saleable_investments_df_subset))
-    transaction_type_ids[start_position:end_position] = [transaction_type_map.get("investment_proceeds_transfer") for _ in range(len(saleable_investments_df_subset))]
-    wallet_ids[start_position:end_position] = [wallet_id_map.get(uid) for uid in saleable_investments_df_subset["user_id"].values]
-    amount_invested[start_position:end_position] = saleable_investments_df_subset["amount_invested"].values
-    last_transaction_id = transaction_ids[start_position:end_position].max()
-    transaction_amounts[start_position:end_position] = saleable_investments_df_subset["amount_invested"].values
-    transaction_statuses[start_position:end_position] = ["success" for _ in range(len(saleable_investments_df_subset))]
+    dtypes = [device_type_map.get(uid) for uid in saleable_investments_df_subset["user_id"]]
 
+    return_dict = assets_sale_investment_proceeds_wallet_transfer_events(conn, context, start_position, end_position, user_ids, wallet_ids, event_time, device_types, dtypes, transaction_type_ids,transaction_ids, last_transaction_id,
+                                                                         event_type_ids, is_money_movement_activities, transaction_amounts, transaction_statuses, saleable_investments_df_subset)
 
-    saleable_investments_df.loc[
-    saleable_investments_df["investment_id"].isin(redeemed_ids),
-    "investment_status"] = "Redeemed"
+    last_transaction_id = return_dict['last_transaction_id']
+    saleable_investments_df_subset = return_dict['saleable_investments_df']
 
+    # vestable - early_withdrawal_df and vested_investment_df
+    # saleable - saleable_investments_df_subset
 
+    vestable_investments_df = pd.concat([early_withrawal_df, vested_investments_df])
 
-    saleable_updates = (
-    saleable_investments_df_subset[
-        ["investment_id", "investment_maturity_date"]
-    ]
-    .set_index("investment_id")
-)
-
-    saleable_investments_df["investment_maturity_date"] = (
-    saleable_investments_df["investment_id"]
-    .map(saleable_updates["investment_maturity_date"])
-    .fillna(saleable_investments_df["investment_maturity_date"])
-)
+    saleable_investments_df.loc[saleable_investments_df_subset] = saleable_investments_df_subset
 
     all_investments_df = pd.concat([active_investments_df, vestable_investments_df, saleable_investments_df], ignore_index = True)
 

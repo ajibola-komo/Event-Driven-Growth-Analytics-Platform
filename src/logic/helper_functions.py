@@ -881,9 +881,9 @@ def assets_sale_events(context:any, start_position:int, end_position:int, user_i
     event_type_ids[start_position:end_position] = [context.assets_sale_event_type_id] * len(saleable_investments_df)
     device_types[start_position:end_position] = dtypes
 
-def assets_sale_investment_proceeds_wallet_transfer(conn:DuckDBPyConnection, context:any, start_position:int, end_position:int, user_ids:list[int], wallet_ids:list[int],
+def assets_sale_investment_proceeds_wallet_transfer_events(conn:DuckDBPyConnection, context:any, start_position:int, end_position:int, user_ids:list[int], wallet_ids:list[int],
                                                     event_time:list[pd.Timestamp], device_types:list[str], dtypes, transaction_type_ids:list[int], transaction_ids:list[int],
-                                                    last_transaction_id:int, event_type_ids, is_money_movement_activity:list[bool], transaction_amounts:list[float], traansaction_statuses:list[str],
+                                                    last_transaction_id:int, event_type_ids, is_money_movement_activity:list[bool], transaction_amounts:list[float], transaction_statuses:list[str],
                                                     saleable_investment_df:pd.DataFrame) -> dict:
 
     saleable_investment_df = saleable_investment_df.copy()
@@ -902,7 +902,7 @@ def assets_sale_investment_proceeds_wallet_transfer(conn:DuckDBPyConnection, con
     saleable_investment_df['interest_rate'] = np.random.randint(8,19,size=len(saleable_investment_df))
     saleable_investment_df['amount_paid_out'] = saleable_investment_df['amount_invested'] * (1 + (saleable_investment_df['interest_rate']/100))
     transaction_amounts[start_position:end_position] = saleable_investment_df['amount_paid_out']
-    traansaction_statuses[start_position:end_position] = ["success"] * len(saleable_investment_df)
+    transaction_statuses[start_position:end_position] = ["success"] * len(saleable_investment_df)
     saleable_investment_df['investment_status'] = ["Redeemed"] * len(saleable_investment_df)
     saleable_investment_df['is_withdrawn_early'] = False
     saleable_investment_df['penalty_amount'] = 0.0
